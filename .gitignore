@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 *.so
 
+# Python build/package artifacts
+build/
+dist/
+*.egg-info/
+
 # Virtual environment
 .venv/
 venv/
