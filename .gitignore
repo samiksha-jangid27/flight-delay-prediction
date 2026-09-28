@@ -50,3 +50,7 @@ reports/results/*
 
 # Temporary files
 *.tmp
+
+build/
+dist/
+*.egg-info/
