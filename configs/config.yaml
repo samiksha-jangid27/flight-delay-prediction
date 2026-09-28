@@ -1,0 +1,24 @@
+project:
+  name: flight-delay-prediction
+  random_seed: 42
+
+data:
+  raw_path: data/raw/
+  interim_path: data/interim/
+  processed_path: data/processed/
+
+target:
+  delay_threshold_minutes: 15
+
+split:
+  type: chronological
+  train_ratio: 0.70
+  validation_ratio: 0.15
+  test_ratio: 0.15
+
+models:
+  logistic_regression:
+    max_iter: 1000
+
+  xgboost:
+    random_state: 42
