@@ -27,6 +27,8 @@ venv/
 
 # Raw/intermediate/processed datasets
 data/raw/*
+data/raw/*
+!data/raw/*.csvls -lh data/raw/flights.csv
 data/interim/*
 data/processed/*
 
