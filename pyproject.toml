@@ -7,6 +7,10 @@ name = "flight-delay-prediction"
 version = "0.1.0"
 description = "Leakage-safe flight delay prediction using advanced machine learning"
 requires-python = ">=3.11"
+dependencies = [
+  "pandas", "numpy", "scikit-learn", "xgboost",
+  "matplotlib", "seaborn", "jupyter", "pytest", "pyyaml",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
