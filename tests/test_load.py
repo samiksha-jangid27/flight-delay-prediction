@@ -2,7 +2,6 @@ from pathlib import Path
 
 from flight_delay.data.load import load_flights
 
-
 DATA_PATH = Path("data/raw/flights.csv")
 
 

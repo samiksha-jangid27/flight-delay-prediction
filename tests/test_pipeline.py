@@ -2,7 +2,6 @@ from pathlib import Path
 
 from flight_delay.data.pipeline import build_data_pipeline
 
-
 DATA_PATH = Path("data/raw/flights.csv")
 
 
@@ -26,3 +25,21 @@ def test_pipeline_preserves_row_count_after_target_filter():
     # 9,430 rows have missing arrival delay and are excluded
     # from the classification population.
     assert total == 327_346
+
+
+def test_pipeline_includes_engineered_features():
+    train, validation, test = build_data_pipeline(DATA_PATH)
+
+    expected = {
+        "day_of_week",
+        "is_weekend",
+        "season",
+        "hour_sin",
+        "route",
+        "distance_band",
+        "is_long_haul",
+        "distance_log",
+    }
+
+    for split in (train, validation, test):
+        assert expected.issubset(split.columns)

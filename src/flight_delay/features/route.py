@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-
 # Distance bands in miles. Delay dynamics differ for short shuttle hops
 # versus long-haul transcontinental flights.
 DISTANCE_BINS = [0, 250, 500, 750, 1000, 1500, 2000, 6000]

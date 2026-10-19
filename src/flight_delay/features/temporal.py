@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-
 # Periods used for cyclic (sin/cos) encodings.
 HOUR_PERIOD = 24
 MONTH_PERIOD = 12

@@ -8,7 +8,7 @@ build/
 dist/
 *.egg-info/
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
 
@@ -27,32 +27,27 @@ venv/
 
 # Raw/intermediate/processed datasets
 data/raw/*
-data/raw/*
-!data/raw/*.csvls -lh data/raw/flights.csv
-data/interim/*
-data/processed/*
-
-# Keep directory placeholders
+!data/raw/flights.csv
 !data/raw/.gitkeep
+data/interim/*
 !data/interim/.gitkeep
+data/processed/*
 !data/processed/.gitkeep
 
 # Model artifacts
 models/artifacts/*
 !models/artifacts/.gitkeep
 
-# Reports generated locally
+# Generated reports
 reports/figures/*
-reports/results/*
 !reports/figures/.gitkeep
+reports/results/*
 !reports/results/.gitkeep
 
-# Logs
+# Logs and temporary files
 *.log
-
-# Temporary files
 *.tmp
 
-build/
-dist/
-*.egg-info/
+# Test coverage artifacts
+.coverage
+htmlcov/

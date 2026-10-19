@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-
 HISTORICAL_KEYS = {
     "carrier": "carrier",
     "origin": "origin",

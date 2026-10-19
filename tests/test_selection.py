@@ -23,7 +23,7 @@ def test_leakage_columns_are_removed():
         }
     )
 
-    X, y = split_features_and_target(df)
+    X, _y = split_features_and_target(df)
 
     assert "carrier" in X.columns
     assert "origin" in X.columns

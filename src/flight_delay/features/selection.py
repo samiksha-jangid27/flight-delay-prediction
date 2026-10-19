@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-
 TARGET_COLUMN = "is_delayed"
 
 EXCLUDED_COLUMNS = {
