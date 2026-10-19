@@ -4,10 +4,11 @@
 **Owner:** Rashmi Anand (EDA & Feature Engineering)
 
 Why each engineered feature may help, grounded in the EDA
-([notebooks/01_data_exploration.ipynb](../notebooks/01_data_exploration.ipynb),
-figures in [reports/figures/](../reports/figures/)). All statistics are from the
-**training split only** (base delay rate ≈ **25.9%**). Train covers the earliest
-~70% of 2013 dates (roughly Jan–Sep) under the chronological split.
+([notebooks/01_data_exploration.ipynb](../notebooks/01_data_exploration.ipynb);
+the notebook embeds plots and writes PNGs to `reports/figures/` when run).
+All statistics are from the **training split only** (base delay rate ≈ **25.9%**).
+Train covers the earliest ~70% of 2013 dates (roughly Jan–Sep) under the
+chronological split.
 
 All features below use pre-departure information only — see
 [feature_policy.md](feature_policy.md).

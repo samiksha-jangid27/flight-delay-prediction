@@ -34,7 +34,6 @@ rather than silently deleted.
 
 ## 5. Allowed Candidate Features
 
-- year
 - month
 - day
 - sched_dep_time
@@ -74,12 +73,33 @@ and evaluated separately.
 
 - year
 
-## 7. Historical Feature Rule
+The `year` column is still required internally to reconstruct each flight's
+calendar date for chronological splitting and historical features; it is not
+passed to the model as a standalone feature.
 
-Historical features must use only observations that occurred before the
-flight being predicted.
+## 7. Historical Feature Rule and Evaluation Protocol
 
-Future observations must never contribute to a historical aggregate.
+The project uses a **rolling daily forecast protocol** for historical
+features:
+
+- For a flight on calendar date **D**, carrier, origin, destination and route
+  aggregates use labelled flights on calendar dates strictly earlier than D.
+- Every flight on the same date receives history computed before that date;
+  same-day outcomes are never used, even if another flight on that date has
+  already arrived.
+- During validation and test, actual outcomes from earlier held-out dates may
+  update the historical features of later dates. This simulates daily operation,
+  where yesterday's outcomes are available before predicting today's flights.
+- These prior-date outcomes are used only to construct later-date history; they
+  must not be used to fit the model or preprocessing on validation/test data.
+
+This is a rolling evaluation, not a fixed holdout with historical statistics
+frozen at the training cutoff. If the final evaluation requires fixed holdout
+history, the feature-generation protocol must instead freeze historical
+aggregates at the training cutoff and must be documented as a separate setup.
+
+Future-date outcomes must never contribute to current or earlier historical
+features.
 
 ## 8. Data Split
 
