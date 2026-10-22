@@ -1,8 +1,8 @@
 # Flight Delay Prediction
 
-A leakage-safe machine learning system that predicts whether a scheduled
-flight will arrive substantially late, using only information available
-before departure.
+A chronology-aware machine learning system that predicts whether a scheduled
+flight will arrive substantially late, using schedule information and
+prior-date history subject to the availability assumptions documented below.
 
 <div align="center">
 
@@ -11,9 +11,9 @@ before departure.
 Team ID `T022` &nbsp;·&nbsp; Section `C`
 
 ![Status](https://img.shields.io/badge/phase-Advanced%20ML-blue)
-![Tests](https://img.shields.io/badge/tests-29%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-local%20verification-blue)
 ![Python](https://img.shields.io/badge/python-3.11%2B-informational)
-![Leakage](https://img.shields.io/badge/data-leakage--safe-success)
+![Protocol](https://img.shields.io/badge/history-prior%20dates%3B%20availability%20unverified-yellow)
 
 </div>
 
@@ -39,9 +39,10 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 
 Flight delays are expensive and disruptive, and most operational value comes
 from knowing about a likely delay *before* the aircraft leaves the gate. This
-project builds a predictive pipeline under a strict constraint: every feature
-must be computable from information that exists at scheduling time. No
-post-departure signal is ever allowed to reach the model.
+project builds a predictive pipeline targeting the scheduled-departure decision
+point. Direct post-departure columns are excluded. Historical aggregates use prior calendar dates, but their
+exact outcome availability before each prediction remains unverified; see
+[the historical protocol](docs/historical_features.md).
 
 The work is delivered in two phases:
 
@@ -71,8 +72,8 @@ rows with an undefined arrival outcome are dropped rather than imputed.
 ## System Architecture
 
 The data pipeline is a single, ordered path from raw records to three
-chronologically separated datasets. Each stage is leakage-safe by
-construction.
+chronologically separated datasets. Date ordering is enforced; this alone does
+not establish outcome availability at the actual prediction time.
 
 ```mermaid
 flowchart LR
@@ -97,8 +98,8 @@ flowchart LR
     style K fill:#f1f3f4,stroke:#9aa0a6,stroke-dasharray: 4 4
 ```
 
-> Solid blue stages are implemented and tested. Dashed grey stages are the
-> upcoming modelling and evaluation deliverables.
+> The pipeline, Logistic Regression, tuned XGBoost, calibration and evaluation
+> are implemented. The diagram colors group stages; they do not indicate completion.
 
 The orchestration lives in
 [`pipeline.py`](src/flight_delay/data/pipeline.py), and the chronological
@@ -141,7 +142,7 @@ introduce no leakage.
 
 ### Historical delay features &nbsp;·&nbsp; [`historical.py`](src/flight_delay/features/historical.py)
 
-Leakage-safe delay statistics computed from **previous calendar dates only** —
+Historical delay statistics computed from **previous calendar dates only** —
 same-day observations are deliberately excluded via a shifted cumulative
 aggregation.
 
@@ -207,7 +208,7 @@ Selected findings:
 
 <div align="center">
   <img src="reports/figures/historical_feature_correlation.png" alt="Historical feature correlation" width="60%"/>
-  <p><sub><b>Historical feature correlation</b> — leakage-safe historical rates correlate with the target, confirming predictive value without using future information.</sub></p>
+  <p><sub><b>Historical feature correlation</b> — Prior-date historical rates correlate with the target; correlation alone does not establish predictive utility or availability-time safety.</sub></p>
 </div>
 
 ---
@@ -222,7 +223,7 @@ flight-delay-prediction/
 │   ├── interim/        Intermediate artifacts
 │   └── processed/      Model-ready datasets
 ├── docs/               Data contract, feature policy, dictionaries
-├── models/             Saved model artifacts (populated in modelling phase)
+├── models/             Saved model artifacts (ignored)
 ├── notebooks/          Exploratory analysis
 ├── reports/
 │   ├── figures/        EDA visualizations
@@ -250,7 +251,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-Build the leakage-safe datasets:
+Build the chronological datasets:
 
 ```python
 from flight_delay.data.pipeline import build_data_pipeline
@@ -273,9 +274,16 @@ attention to leakage prevention in the historical features.
 pytest
 ```
 
-```text
-29 passed
+The full local suite includes seven tests that read `data/raw/flights.csv`.
+CI uses Python 3.12 and runs synthetic fixtures only:
+
+```bash
+python -m pytest -q --ignore=tests/test_load.py --ignore=tests/test_pipeline.py --ignore=tests/test_prepare.py
 ```
+
+No CI job trains on the real dataset or evaluates the real final-test partition.
+See [the evaluation audit](docs/evaluation_audit.md) for actual execution results,
+versions and remaining limitations.
 
 ---
 
@@ -295,14 +303,14 @@ pytest
 
 **Advanced ML phase**
 
-- [x] Leakage-safe data pipeline and chronological validation
+- [x] Prior-date historical pipeline and chronological validation (availability caveat documented)
 - [x] Temporal, route, and historical feature engineering
 - [x] Exploratory data analysis
 - [x] Automated test suite
-- [ ] Logistic Regression baseline
-- [ ] XGBoost classifier with hyperparameter tuning
-- [ ] PR-AUC, ROC-AUC, precision and recall reporting
-- [ ] Probability calibration and operational threshold analysis
+- [x] Logistic Regression baseline
+- [x] XGBoost classifier with hyperparameter tuning
+- [x] PR-AUC, ROC-AUC, precision and recall reporting
+- [x] Probability calibration and operational threshold analysis
 - [ ] Offline rescheduling impact analysis
 
 **Deep Learning phase**
@@ -319,3 +327,26 @@ pytest
 The project uses the recommended Kaggle US flight dataset as the starter
 dataset. Acquisition instructions are documented separately; the raw file is
 expected at `data/raw/flights.csv`.
+
+## Evaluation and supplementary audits
+
+The original full-training model comparison and the later early-training
+calibration study use different fitted estimators. Their validation results and
+frozen held-out test scores are documented separately in
+[the original evaluation report](docs/evaluation_results.md).
+
+```bash
+python scripts/audit_evaluation.py --data data/raw/flights.csv --output-dir reports/evaluation
+python -m scripts.analyze_calibration_baselines --data data/raw/flights.csv --output-dir reports/evaluation
+```
+
+Both commands create a new uniquely named JSON report and preserve existing
+artifacts. The baseline analysis fits constants on base-training or late-training
+calibration labels only; it never reads test metrics. On macOS, XGBoost needs
+OpenMP (`brew install libomp`); the documented local environment uses
+`DYLD_LIBRARY_PATH="$PWD/.venv/libomp"` as an alternative.
+
+A separate reproduction exactly matched the published frozen experiment on the
+same dataset and package versions. This establishes reproducibility for that
+environment, not production readiness or proof of historical label availability.
+See [audit methodology, evidence and reproduction commands](docs/evaluation_audit.md).
