@@ -17,6 +17,7 @@ import numpy as np
 from sklearn import metrics
 
 from flight_delay.evaluation.baselines import fit_prevalence
+from flight_delay.evaluation.run_state import require_completed_validation
 from scripts.audit_evaluation import (
     load_json,
     read_predictions,
@@ -27,6 +28,7 @@ from scripts.audit_evaluation import (
 
 def analyze(data: Path, output_dir: Path, *, diagnose_logistic: bool = False) -> dict:
     """Use pre-validation labels for constants and validation labels only for scoring."""
+    require_completed_validation(output_dir)
     manifest_path = output_dir / "selection.json"
     manifest = load_json(manifest_path)
     data_hash = sha256(data)

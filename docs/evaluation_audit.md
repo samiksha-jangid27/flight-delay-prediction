@@ -125,17 +125,17 @@ Neither alternative was substituted or tuned against the final test. See
 
 ## Remaining implementation and methodological limitations
 
-- The original evaluation runner's incomplete-run guards remain weaker than its
-  completed-run checks: interrupted plotting can permit re-scoring on retry, and
-  an orphan joblib without selection.json can be overwritten by validation. These
-  are documented, **not fixed** by the independent auditor. Reproduction used a
-  fresh directory and completed without such failures.
+- At the PR #5 snapshot, the original runner's incomplete-run guards allowed
+  retries after interrupted plotting and unprotected orphan artifacts. These
+  were not fixed by the independent auditor. The PR #6 hardening section below
+  records the subsequent runner fixes. The earlier reproduction completed in a
+  fresh directory without such failures.
 - Producer finalization checks dataset/joblib hashes but does not enforce all
   recorded schema/version/source provenance. The independent auditor checks
   recorded versions and schema; it cannot retroactively prove execution history.
-- The original generic splitter accepts NaT dates; the independent audit rebuild
-  rejects missing dates. The actual dataset has valid date components. Original
-  generic helper behavior was not changed in this contribution.
+- At the PR #5 snapshot, the generic splitter accepted NaT dates while the
+  independent audit rebuild rejected them. The PR #6 hardening below adds
+  defensive splitter validation; the valid-data partition rule remains unchanged.
 - XGBoost parameters were previously selected over all original training dates,
   including those subsequently reserved for calibration. This is conditional,
   rather than fully nested, calibration evidence.
@@ -208,3 +208,151 @@ complete, repeated audits can read its saved CSV/JSON files without generating
 new model predictions. The audit and baseline commands write unique reports;
 raw data, joblib files, prediction streams and original metrics are never replaced.
 Generated reports/models remain ignored and are not part of the commit.
+
+## Evaluation hardening — PR #6
+
+This follow-up changes safety and reproducibility, not model selection or scores.
+The baseline on merged main `ed5b275` was **145 passing tests**. No real classifier
+was retrained and no real final-test command was executed for this change.
+
+### Confirmed root causes and fixes
+
+1. **Prediction CSV ingestion:** default pandas float parsing can move a score
+   below a threshold it originally equalled. Default numeric ID inference also
+   destroys leading zeros. `flight_delay.evaluation.predictions.load_prediction_csv`
+   now specifies `dtype={"flight_id": "string"}` and
+   `float_precision="round_trip"`, validates required fields, labels, dates,
+   unique/nonmissing IDs and finite [0,1] probabilities, and optionally requires a
+   matching explicit partition tag. The older model CSVs have four core columns;
+   their notebook consumer uses the helper without inventing partition metadata.
+   Raw input loading now preserves `id` as a string as well, so rebuilding
+   features cannot lose the ID's leading zeros. IDs are never model features.
+   The independent auditor already used safe parsing and retains its own loader
+   and independent sklearn metric calculations; the baseline script already
+   consumed that safe auditor loader. No redundant metric refactor was made.
+   Test fixtures that load non-threshold demonstration outputs are not external
+   prediction APIs. External consumers must use this helper or the equivalent
+   dtype/round-trip contract; the repository cannot enforce their pandas options.
+
+2. **Interrupted output lifecycle:** previously, only selection.json or
+   test_metrics.json protected a run, and these files were written after some
+   other work. A failure could leave unguarded outputs. New validation requires
+   an empty directory. Both stages exclusively create `.validation_started.json`
+   or `.final_test_started.json` **before work**, then generate everything in
+   `.validation_staging/` or `.final_test_staging/`. Publication creates files
+   using non-replacing filesystem links and creates partition figure directories
+   exclusively; it never replaces an existing destination. A corresponding
+   `*_complete.json` marker is written and flushed only after publication succeeds.
+   Completed staging is then removed. Shared `figures/` may remain from validation;
+   an existing `figures/test/` is never merged or replaced.
+
+   The start marker is a persistent at-most-once claim, not a PID lock that expires
+   when a process dies. Exceptions retain the marker, staged artifacts and any
+   partially published files. Concurrent cooperative invocations cannot both
+   acquire the same exclusive marker. Finalization rejects old test metrics,
+   `*_test.csv`, `figures/test`, final-stage markers/staging, or incomplete new-style
+   validation before deserializing/scoring models. Read-only dataset/joblib hash
+   verification remains in place. Legacy completed validation artifacts without
+   phase markers remain readable, and legacy final-test files still block repeats.
+   The independent auditor rejects incomplete or malformed new-style phase markers.
+   The supplementary baseline reader also rejects incomplete validation before loading inputs.
+
+3. **Unverified prediction origin:** the independent metric audit established
+   consistency of saved CSVs, but did not regenerate their scores from estimators.
+   `scripts/verify_frozen_predictions.py` now checks input hashes **before loading**
+   the trusted local joblib, package versions, feature schema, model settings,
+   calibrator identity and exact frozen threshold. It rebuilds the unchanged
+   feature pipeline, validates the full saved validation ID/date/label population,
+   and predicts a deterministic seed-42 sample selected from sorted string IDs.
+   Rows are selected by ID, not row position. It compares calibrated probabilities
+   with `atol=rtol=1e-12` and compares classes separately using the exact
+   `probability >= threshold` rule with **no classification tolerance**. No fit,
+   fit_transform, search or threshold-selection method is called. It opens no
+   test metrics and makes no predictions on test records. The upstream builder
+   still constructs all chronological partitions; its returned test frame is
+   never scored or used for selection. The verifier writes only to stdout.
+   Original LR manifests lack a complete parameter snapshot; the verifier checks
+   the unchanged C/class-weight/solver/iteration settings in addition to the
+   serialized artifact hash. It does not reconstruct an immutable fitting history.
+
+4. **Invalid chronological dates:** the splitter previously counted NaT as an
+   additional unique date. Missing components are now rejected before grouping;
+   nonnumeric, non-integral or invalid calendar components produce clear
+   ValueErrors. The original valid-data date fractions, rounding, record order
+   and whole-date partitioning are unchanged. Full-population raw-ID/date checks
+   and synthetic exact-window comparisons support this preservation.
+
+### Recovery policy
+
+Do not remove a start marker, edit completion markers, clear staging, or invoke a
+retry to get around the safeguards. Preserve the failed directory and inspect its
+traceback, stage contents and phase markers. After an interrupted **validation**,
+use a new empty directory if a new training experiment is explicitly authorized.
+After an interrupted **final-test** attempt, stop and manually review whether any
+test scoring occurred; there is no automatic retry/unlock mode. Previously saved
+results may be audited without scoring a model. If only plotting failed after
+publication, inspect/recreate figures from the preserved saved predictions in a
+separate location rather than repeating final-test scoring. This contribution
+adds no automatic recovery/rescoring command.
+
+These guards protect cooperative local process interruption/concurrency; they
+are not an immutable remote execution ledger or a claim of fully transactional
+filesystem behavior during hardware/power failure. Deleting files manually can
+bypass any local file-based guard. Legacy unmarked runs cannot retroactively
+prove their execution history. Those limitations are not converted into PASSes.
+
+### Actual verification and regression coverage
+
+- Full suite: **209 passed**, zero failed/skipped.
+- CI-equivalent synthetic suite: **202 passed**, zero failed/skipped; the same
+  seven real-data loader/preparation tests remain excluded by the existing CI.
+- New regression cases cover round-trip threshold equality and repeated isotonic
+  scores, leading-zero IDs, missing/invalid prediction fields, partial validation,
+  completed and partial legacy final outputs, artifact-writing and publication
+  failures, exclusive concurrent claims, preservation of existing destinations,
+  marker validation, corrupt hashes/settings/labels/scores, deterministic sampling
+  and a sub-tolerance score difference that still changes its class.
+- Frozen-model replay on **100 validation flights**: both LR and XGBoost matched
+  their saved calibrated probabilities exactly (maximum absolute error **0.0**)
+  and matched every sampled class under their original thresholds. Model methods
+  were called for validation predictions only; no model was fitted.
+- Synthetic monkeypatch tests explicitly make model/calibrator fitting and
+  preprocessing fit_transform fail if called during verification, forbid opening
+  test_metrics.json, and check byte preservation on success and failure.
+- The original independent audit is rerun against saved artifacts only. Source
+  and artifact hash checks accompany the final review; original prediction CSVs,
+  joblib bytes, test metrics and published score tables are not edited.
+
+### Local verification commands
+
+```bash
+cd ~/Documents/flight-delay-prediction
+source .venv/bin/activate
+export DYLD_LIBRARY_PATH="$PWD/.venv/libomp:${DYLD_LIBRARY_PATH:-}"
+python -m pytest -q
+python -m pytest -q --ignore=tests/test_load.py --ignore=tests/test_pipeline.py --ignore=tests/test_prepare.py
+python scripts/verify_frozen_predictions.py \
+  --data data/raw/flights.csv --output-dir reports/evaluation \
+  --partition validation --sample-size 100
+python scripts/audit_evaluation.py --data data/raw/flights.csv --output-dir reports/evaluation
+git diff --check
+git status --short
+```
+
+Do **not** rerun the real final-test command to validate these fixes. No published
+score, threshold, map, hyperparameter or validation choice is improved or changed
+here. Historical outcome availability remains unverified with the current clock-
+valued CSV, prior hyperparameter selection is not fully nested with respect to the
+calibration block, and already-evaluated final-test results must not be used for
+new optimization. This remains a Phase 1 academic evaluation, not a claim of
+production readiness or complete leakage freedom.
+
+The verifier checks a deterministic sample, not every stored probability. It does
+not assert predictive performance on a new test set or establish immutable model
+provenance. Full frozen test prediction replay is intentionally not performed.
+
+Final preservation check: all **124** pre-existing local evaluation files (including
+the earlier reproduction) remained byte-identical. GitHub-hosted CI for this
+uncommitted hardening branch has not run; its unchanged Python 3.12 workflow and
+local synthetic equivalent were reviewed. Publication is left for the explicit
+post-review Git step rather than performed automatically.

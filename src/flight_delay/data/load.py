@@ -14,7 +14,7 @@ def load_flights(path: str | Path) -> pd.DataFrame:
     if path.suffix.lower() != ".csv":
         raise ValueError(f"Expected a CSV file, got: {path.suffix}")
 
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype={"id": "string"})
 
     if df.empty:
         raise ValueError("The dataset is empty.")

@@ -34,13 +34,20 @@ def chronological_split(
 
     result = df.copy()
 
-    result["_flight_date"] = pd.to_datetime(
-        {
-            "year": result["year"],
-            "month": result["month"],
-            "day": result["day"],
-        }
-    )
+    date_fields = result[["year", "month", "day"]]
+    if date_fields.isna().any().any():
+        raise ValueError(
+            "Flight date components must not contain missing values or NaT"
+        )
+    try:
+        numeric_dates = date_fields.apply(pd.to_numeric, errors="raise")
+        if ((numeric_dates % 1) != 0).any().any():
+            raise ValueError("Flight date components must be integers")
+        result["_flight_date"] = pd.to_datetime(numeric_dates, errors="raise")
+    except (ValueError, TypeError, OverflowError) as error:
+        raise ValueError(f"Invalid flight date components: {error}") from error
+    if result["_flight_date"].isna().any():
+        raise ValueError("Flight dates must not contain NaT")
 
     unique_dates = (
         result["_flight_date"]
