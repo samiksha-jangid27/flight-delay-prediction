@@ -1,0 +1,31 @@
+name: Synthetic tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install project
+        run: python -m pip install -e .
+      - name: Run synthetic tests only
+        # These three modules alone read the actual raw dataset. All model fits
+        # in the remaining tests use tiny synthetic fixtures and temp outputs.
+        run: >-
+          python -m pytest -q
+          --ignore=tests/test_load.py
+          --ignore=tests/test_pipeline.py
+          --ignore=tests/test_prepare.py

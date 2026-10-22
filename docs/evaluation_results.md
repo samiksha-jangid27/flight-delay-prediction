@@ -183,3 +183,80 @@ For this frozen study, retain the validation-selected isotonic maps and threshol
 3. **Calibration:** raw/sigmoid/isotonic Brier and log loss; reliability with counts; isotonic ranking ties and prevalence-baseline limitation.
 4. **Threshold selection:** F1 versus F2 and illustrative precision constraints; chosen thresholds and false-alert/missed-delay counts; freeze before test.
 5. **Conclusions:** actual held-out AP/F1 and confusion matrices; changed model ordering, temporal shift, operational costs and research next steps.
+
+
+## Supplementary calibration-quality audit — 22 October 2026
+
+This appendix supplements the frozen study above. No original scores, maps,
+thresholds or selection rules were replaced. The isolated reproduction and
+independent audit are documented in [evaluation_audit.md](evaluation_audit.md).
+
+Two training-only constants were estimated without validation/test labels
+under the same prior-date outcome-availability assumption: base-training prevalence **0.265852650** (181,405 flights, Jan 1–Jul 23)
+and late-training calibration prevalence **0.233142833** (46,894 flights,
+Jul 24–Sep 12). Both were scored on the exact same 50,466 validation IDs as the
+models; no test metrics informed this analysis.
+
+| Candidate | brier | log_loss | average_precision |
+|---|---:|---:|---:|
+| base_train | 0.143920014 | 0.467913933 | 0.156402330 |
+| train_calibration | 0.137829746 | 0.451675039 | 0.156402330 |
+| logistic_balanced (frozen isotonic) | 0.150899305 | 0.482196703 | 0.223284804 |
+| xgboost_tuned_full (frozen isotonic) | 0.137199003 | 0.442804442 | 0.212871158 |
+
+Lower Brier/log loss is better. Both constants' AP equals validation prevalence
+because a constant supplies no ranking discrimination. Balanced LR's selected
+isotonic probabilities lose to **both** valid constants on Brier and log loss.
+XGBoost's selected isotonic probabilities beat **both**, with Brier improvement
+of only 0.000630743 and log-loss improvement 0.008870597 versus the stronger
+late-training constant. This is a descriptive point-estimate comparison; no
+significance claim for these proper-score differences is established.
+
+Calibration still improves both models versus their raw scores, as the original
+table shows. Improvement over severely distorted raw probabilities is therefore
+not sufficient evidence of useful probability forecasts: LR fails the valid
+constant references. The earlier 0.131940641 Brier number remains explicitly a
+**validation-label oracle/descriptive reference**, not a deployable baseline.
+
+LR raw/sigmoid predictions have 50,464 distinct validation scores and no tied
+positive-negative score pairs. Isotonic reduces this to **84** distinct scores
+and **59,576,982** positive-negative tied pairs. Isotonic is monotone but can
+collapse previously ordered scores; sklearn's handling of those ties changes AP
+and ROC-AUC, explaining the observed ranking loss without a label-alignment
+error. XGBoost isotonic has 111 distinct scores. These are observed counts, not
+new selection criteria.
+
+Both training windows have higher delay prevalence than validation (0.156402330).
+The frozen LR raw mean probability rises from 0.642540903 on calibration dates
+to 0.781884470 on validation, although observed prevalence falls. Its selected
+isotonic mean rises from 0.233142833 to 0.305147348. XGBoost selected validation
+mean is 0.230978576. A map fitted on one score/label distribution is not guaranteed
+to match prevalence after temporal shift; neither map is re-centered using
+validation labels in this audit.
+
+An optional frozen-LR diagnostic decomposes mean linear predictor contributions.
+From calibration to validation, mean logit rises from **0.652030474** to
+**1.405247181**. Month contributes +0.497016088, month cosine +0.326696327 and
+season +0.194964799 to that change. Historical-count features collectively
+contribute **-0.279982527**, opposing the upward movement. Thus an assertion that
+increasing history counts alone caused overprediction is not supported by this
+decomposition. Calendar/covariate movement in the frozen linear predictor is
+observed; causal attribution would require separate controlled experiments.
+A mean logit is not the logit of a mean probability. Training/calibration diagnostic
+means are explanatory summaries, not independent calibration performance results.
+
+Reproduce without changing the frozen experiment:
+
+```bash
+python -m scripts.analyze_calibration_baselines \
+  --data data/raw/flights.csv --output-dir reports/evaluation \
+  --diagnose-logistic
+```
+
+This exclusively creates `calibration_baselines_<uuid>.json`, including input
+hashes, dependency versions, fitting windows, score comparisons and optional
+frozen-estimator link diagnostics. Tests reject fitting on validation/test tags,
+verify validation/test outcome changes cannot alter fitted constants, and ensure
+the analysis never opens test metrics or modifies frozen artifacts. Exact outcome
+availability, conditional hyperparameter-selection provenance, temporal shift
+and unspecified intervention costs remain limitations.
