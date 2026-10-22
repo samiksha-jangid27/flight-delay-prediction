@@ -33,60 +33,19 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from xgboost import XGBClassifier
 
-# Explicit allowlist: introducing new columns upstream cannot silently introduce
-# outcome fields into a fitted model.
-SCHEDULE_FEATURES: tuple[str, ...] = (
-    "month", "day", "sched_dep_time", "sched_arr_time", "hour", "minute",
-    "carrier", "origin", "dest", "distance", "day_of_week", "is_weekend",
-    "season", "hour_sin", "hour_cos", "month_sin", "month_cos",
-    "day_of_week_sin", "day_of_week_cos",
+# Shared, model-independent feature contract. Keep the old XGBoost selector name
+# as a compatibility alias for previously committed experiments and notebooks.
+from flight_delay.features.model_features import (
+    SCHEDULE_FEATURES,
+    ROUTE_FEATURES,
+    HISTORICAL_FEATURES,
+    FEATURE_SETS,
+    CATEGORICAL_FEATURES,
+    select_model_features as select_xgboost_features,
 )
-ROUTE_FEATURES: tuple[str, ...] = (
-    "route", "distance_band", "is_long_haul", "distance_log",
-)
-HISTORICAL_FEATURES: tuple[str, ...] = (
-    "carrier_historical_delay_rate", "carrier_historical_flight_count",
-    "origin_historical_delay_rate", "origin_historical_flight_count",
-    "destination_historical_delay_rate", "destination_historical_flight_count",
-    "route_historical_delay_rate", "route_historical_flight_count",
-)
-FEATURE_SETS: dict[str, tuple[str, ...]] = {
-    "schedule": SCHEDULE_FEATURES,
-    "route": SCHEDULE_FEATURES + ROUTE_FEATURES,
-    "full": SCHEDULE_FEATURES + ROUTE_FEATURES + HISTORICAL_FEATURES,
-}
-CATEGORICAL_FEATURES: frozenset[str] = frozenset(
-    {"carrier", "origin", "dest", "route", "distance_band"}
-)
+
 MODEL_NAME = "xgboost"
 DEFAULT_SEED = 42
-
-
-def select_xgboost_features(X: pd.DataFrame, feature_set: str = "full") -> pd.DataFrame:
-    """Return a validated feature-only frame, never using arbitrary extra fields.
-
-    High-cardinality ``tailnum``/``flight`` and free-form ``time_hour`` are
-    deliberately excluded. The target, IDs, and post-departure columns are
-    forbidden even if an upstream caller accidentally passes them in ``X``.
-    """
-    if feature_set not in FEATURE_SETS:
-        raise ValueError(f"Unknown feature set {feature_set!r}; expected {list(FEATURE_SETS)}")
-    if not isinstance(X, pd.DataFrame):
-        raise TypeError("X must be a pandas DataFrame with named columns")
-
-    fields = FEATURE_SETS[feature_set]
-    missing = [field for field in fields if field not in X.columns]
-    if missing:
-        raise ValueError(f"Required {feature_set!r} features missing: {missing}")
-
-    selected = X.loc[:, list(fields)].copy()
-    for field in fields:
-        if field in CATEGORICAL_FEATURES:
-            # CategoricalDtype works with ordinary object/string values after conversion.
-            selected[field] = selected[field].astype("object")
-        else:
-            selected[field] = pd.to_numeric(selected[field], errors="raise")
-    return selected
 
 
 def make_xgboost_pipeline(

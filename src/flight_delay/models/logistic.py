@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import joblib
+
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
@@ -15,11 +17,12 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from flight_delay.data.prepare import prepare_model_data
-from flight_delay.models.xgboost_model import (
+from flight_delay.data.pipeline import build_data_pipeline
+from flight_delay.features.selection import split_features_and_target
+from flight_delay.features.model_features import (
     FEATURE_SETS,
     CATEGORICAL_FEATURES,
-    select_xgboost_features,
+    select_model_features,
 )
 
 MODEL_NAME = "logistic_regression"
@@ -39,6 +42,11 @@ def make_logistic_pipeline(
             f"Unknown feature set {feature_set!r}; "
             f"expected {list(FEATURE_SETS)}"
         )
+
+    if not np.isfinite(C) or C <= 0:
+        raise ValueError("C must be a positive, finite number")
+    if class_weight not in (None, "balanced"):
+        raise ValueError("class_weight must be None or 'balanced'")
 
     fields = FEATURE_SETS[feature_set]
     numeric_fields = [
@@ -121,7 +129,7 @@ def fit_logistic_baseline(
         C=C,
         class_weight=class_weight,
     )
-    X_selected = select_xgboost_features(X_train, feature_set)
+    X_selected = select_model_features(X_train, feature_set)
     pipeline.fit(X_selected, y_train)
 
     return pipeline
@@ -131,6 +139,7 @@ def run_experiment(
     data_path: str | Path = "data/raw/flights.csv",
     *,
     output_dir: str | Path = "reports/results",
+    model_dir: str | Path = "models/artifacts",
     feature_set: str = "full",
     random_state: int = DEFAULT_SEED,
     C: float = 1.0,
@@ -139,20 +148,14 @@ def run_experiment(
     """Train, evaluate and export validation predictions."""
     data_path = Path(data_path)
     output_dir = Path(output_dir)
+    model_dir = Path(model_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    model_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use the project's shared leakage-safe data preparation pipeline.
-    splits = prepare_model_data(data_path)
-
-    X_train, y_train = splits["train"]
-    X_validation, y_validation = splits["validation"]
-
-    # Load the original rows to retain flight IDs and dates.
-    # These columns are join keys, never model features.
-    raw = pd.read_csv(data_path)
-    from flight_delay.data.pipeline import build_data_pipeline
-
-    _, validation, _ = build_data_pipeline(data_path)
+    # Single pipeline execution retains matching identifiers, labels and features.
+    train, validation, _test_untouched = build_data_pipeline(data_path)
+    X_train, y_train = split_features_and_target(train)
+    X_validation, y_validation = split_features_and_target(validation)
     validation_dates = pd.to_datetime(
         validation[["year", "month", "day"]]
     ).dt.strftime("%Y-%m-%d")
@@ -174,7 +177,7 @@ def run_experiment(
         class_weight=class_weight,
     )
 
-    X_selected = select_xgboost_features(X_validation, feature_set)
+    X_selected = select_model_features(X_validation, feature_set)
     probabilities = model.predict_proba(X_selected)[:, 1]
 
     metrics = {
@@ -208,8 +211,14 @@ def run_experiment(
         ]
     ).to_csv(output_dir / "logistic_experiment_results.csv", index=False)
 
+    # Preserve unweighted/balanced model artifacts separately.
+    suffix = "balanced" if class_weight == "balanced" else "unweighted"
+    model_path = model_dir / f"logistic_pipeline_{suffix}_C{C:g}.joblib"
+    joblib.dump(model, model_path)
+
     return {
         "model": model,
+        "model_path": model_path,
         "predictions": predictions,
         "metrics": metrics,
         "output_path": output_path,
@@ -222,6 +231,7 @@ def main() -> None:
     )
     parser.add_argument("--data", default="data/raw/flights.csv")
     parser.add_argument("--results", default="reports/results")
+    parser.add_argument("--models", default="models/artifacts")
     parser.add_argument("--feature-set", choices=list(FEATURE_SETS), default="full")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--C", type=float, default=1.0)
@@ -235,6 +245,7 @@ def main() -> None:
     result = run_experiment(
         data_path=args.data,
         output_dir=args.results,
+        model_dir=args.models,
         feature_set=args.feature_set,
         random_state=args.seed,
         C=args.C,
@@ -245,6 +256,7 @@ def main() -> None:
     for name, value in result["metrics"].items():
         print(f"  {name}: {value:.6f}")
     print("Predictions saved to:", result["output_path"])
+    print("Model saved to:", result["model_path"])
 
 
 if __name__ == "__main__":
