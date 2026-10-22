@@ -464,3 +464,24 @@ def test_single_class_metrics_convention(label):
     assert values["roc_auc"] is None and values["average_precision"] is None
     assert np.isfinite(values["log_loss"])
     assert values["n"] == 2
+
+
+@pytest.mark.parametrize("phase", ["validation", "final_test"])
+def test_auditor_rejects_incomplete_publication(saved_run, phase):
+    data, output = saved_run
+    marker = output / f".{phase}_started.json"
+    write_json(marker, {"phase": phase, "status": "started"})
+    report = audit.run_audit(data, output)
+    assert report["status"] == "FAIL"
+    assert f"publication_state:{phase}" in failed_names(report)
+
+
+def test_auditor_accepts_completed_phase_markers(saved_run):
+    data, output = saved_run
+    for phase in ("validation", "final_test"):
+        for status in ("started", "complete"):
+            write_json(
+                output / f".{phase}_{status}.json", {"phase": phase, "status": status}
+            )
+    report = audit.run_audit(data, output)
+    assert report["status"] == "PASS"

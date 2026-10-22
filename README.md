@@ -337,11 +337,13 @@ frozen held-out test scores are documented separately in
 
 ```bash
 python scripts/audit_evaluation.py --data data/raw/flights.csv --output-dir reports/evaluation
+python scripts/verify_frozen_predictions.py --data data/raw/flights.csv --output-dir reports/evaluation --partition validation --sample-size 100
 python -m scripts.analyze_calibration_baselines --data data/raw/flights.csv --output-dir reports/evaluation
 ```
 
-Both commands create a new uniquely named JSON report and preserve existing
-artifacts. The baseline analysis fits constants on base-training or late-training
+The auditor and baseline commands create uniquely named JSON reports. The frozen
+validation verifier is read-only and prints its findings without writing files.
+All three preserve existing artifacts. The baseline analysis fits constants on base-training or late-training
 calibration labels only; it never reads test metrics. On macOS, XGBoost needs
 OpenMP (`brew install libomp`); the documented local environment uses
 `DYLD_LIBRARY_PATH="$PWD/.venv/libomp"` as an alternative.
@@ -350,3 +352,12 @@ A separate reproduction exactly matched the published frozen experiment on the
 same dataset and package versions. This establishes reproducibility for that
 environment, not production readiness or proof of historical label availability.
 See [audit methodology, evidence and reproduction commands](docs/evaluation_audit.md).
+
+Saved prediction CSVs should be loaded with
+`flight_delay.evaluation.predictions.load_prediction_csv`: it preserves string
+IDs and exact floating-point probabilities, validates the schema, and does not
+round the frozen threshold. Evaluation phases now use persistent exclusive start
+markers and staged, non-overwriting publication. Failed attempts retain evidence
+and cannot be automatically retried. See the hardening and recovery section of
+[the audit documentation](docs/evaluation_audit.md); do not rerun the real final
+test merely to check implementation changes.

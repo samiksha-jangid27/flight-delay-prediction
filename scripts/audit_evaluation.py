@@ -485,6 +485,25 @@ def _inspect_artifacts(
     audit.report.update(
         {"dataset_sha256": dataset_hash, "artifact_sha256": frozen_hash}
     )
+    for phase in ("validation", "final_test"):
+        started = output_dir / f".{phase}_started.json"
+        complete = output_dir / f".{phase}_complete.json"
+        if started.exists() or complete.exists():
+
+            def phase_state(phase=phase, started=started, complete=complete):
+                require(
+                    started.is_file() and complete.is_file(),
+                    f"Incomplete {phase} publication; preserve markers and staging for review",
+                )
+                for path, status in ((started, "started"), (complete, "complete")):
+                    value = read_document(path.name)
+                    require(
+                        value.get("phase") == phase and value.get("status") == status,
+                        f"Invalid {phase} marker",
+                    )
+                return True
+
+            audit.attempt(f"publication_state:{phase}", phase_state)
     manifest = audit.attempt("selection.json", lambda: read_document("selection.json"))
     names = (
         audit.attempt("selection_schema_and_rules", lambda: validate_manifest(manifest))

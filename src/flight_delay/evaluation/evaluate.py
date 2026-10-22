@@ -22,6 +22,7 @@ from flight_delay.models.xgboost_model import fit_xgboost_baseline
 from .calibration import ScoreCalibrator, check_windows
 from .metrics import align_predictions, evaluate, paired_bootstrap
 from .plots import render, summary_plots
+from .run_state import staged_run
 from .thresholds import select_thresholds, threshold_table
 
 # Existing selected parameters, unchanged from scripts/compare_models.py.
@@ -75,9 +76,12 @@ def run_validation(
     data: Path, output: Path, n_jobs: int = 4, n_boot: int = 300
 ) -> dict:
     """Refit early-training bases, calibrate on late training, freeze validation choices."""
-    output.mkdir(parents=True, exist_ok=True)
-    if (output / "selection.json").exists():
-        raise ValueError("Frozen selection exists; use a new output directory")
+    with staged_run(output, "validation") as stage:
+        return _run_validation(data, stage, n_jobs, n_boot)
+
+
+def _run_validation(data: Path, output: Path, n_jobs: int, n_boot: int) -> dict:
+    """Generate one claimed validation run entirely inside its private staging tree."""
     train, val, _ = build_data_pipeline(data)
     days = sorted(dates(train).unique())
     cutoff = days[int(len(days) * 0.8)]
@@ -207,15 +211,23 @@ def run_validation(
 
 def run_final_test(data: Path, output: Path) -> dict:
     """Only apply frozen estimators/calibrators/thresholds; never refit or select."""
+    # Integrity checks are read-only. The exclusive phase claim precedes all
+    # deserialization, feature construction and final-test prediction work.
     manifest = json.loads((output / "selection.json").read_text())
-    if (output / "test_metrics.json").exists():
-        raise ValueError("Final test already evaluated; refusing repeat")
     if (
         fingerprint(data) != manifest["data_sha256"]
         or fingerprint(output / "frozen.joblib") != manifest["artifact_sha256"]
     ):
         raise ValueError("Dataset or frozen artifact identity mismatch")
-    frozen = joblib.load(output / "frozen.joblib")
+    with staged_run(output, "final_test") as stage:
+        return _run_final_test(data, output, stage, manifest)
+
+
+def _run_final_test(
+    data: Path, frozen_output: Path, output: Path, manifest: dict
+) -> dict:
+    """Apply one claimed frozen test phase; never fit or select anything."""
+    frozen = joblib.load(frozen_output / "frozen.joblib")
     _, _, test = build_data_pipeline(data)
     if dates(test).min() <= pd.Timestamp(manifest["windows"]["validation"]["last"]):
         raise ValueError("Test dates overlap validation")

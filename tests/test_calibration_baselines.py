@@ -176,3 +176,11 @@ def test_analysis_never_opens_test_metrics_or_changes_frozen_files(tmp_path):
         first["constants"]["base_train"]["validation"]
         != third["constants"]["base_train"]["validation"]
     )
+
+
+def test_baseline_analysis_rejects_incomplete_validation_before_loading(tmp_path):
+    from scripts.analyze_calibration_baselines import analyze
+
+    (tmp_path / ".validation_started.json").write_text("{}")
+    with pytest.raises(ValueError, match="Incomplete validation"):
+        analyze(tmp_path / "not-opened.csv", tmp_path)
