@@ -51,3 +51,5 @@ reports/results/*
 # Test coverage artifacts
 .coverage
 htmlcov/
+# Regenerable evaluation artifacts
+reports/evaluation/
