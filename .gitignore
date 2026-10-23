@@ -41,6 +41,8 @@ models/artifacts/*
 # Generated reports
 reports/figures/*
 !reports/figures/.gitkeep
+# EDA figures are referenced by README.md and must be tracked so GitHub can render them
+!reports/figures/*.png
 reports/results/*
 !reports/results/.gitkeep
 
