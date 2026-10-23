@@ -10,10 +10,10 @@ prior-date history subject to the availability assumptions documented below.
 
 Team ID `T022` &nbsp;·&nbsp; Section `C`
 
-![Status](https://img.shields.io/badge/phase-Advanced%20ML-blue)
-![Tests](https://img.shields.io/badge/tests-local%20verification-blue)
-![Python](https://img.shields.io/badge/python-3.11%2B-informational)
-![Protocol](https://img.shields.io/badge/history-prior%20dates%3B%20availability%20unverified-yellow)
+<!-- ![Status](https://img.shields.io/badge/phase-Advanced%20ML%20complete-success)
+![Tests](https://img.shields.io/badge/tests-218%20passing-success) -->
+<!-- ![Python](https://img.shields.io/badge/python-3.11%2B-informational) -->
+<!-- ![Protocol](https://img.shields.io/badge/history-prior%20dates%3B%20availability%20unverified-yellow) -->
 
 </div>
 
@@ -26,9 +26,13 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 - [System Architecture](#system-architecture)
 - [Feature Engineering](#feature-engineering)
 - [Exploratory Data Analysis](#exploratory-data-analysis)
-- [Project Status](#project-status)
+- [Results Summary](#results-summary)
+- [Rescheduling What-If Analysis](#rescheduling-what-if-analysis)
 - [Repository Structure](#repository-structure)
 - [Getting Started](#getting-started)
+- [Reproducing the Full Pipeline](#reproducing-the-full-pipeline)
+- [Documentation Index](#documentation-index)
+- [Reports and Generated Artifacts](#reports-and-generated-artifacts)
 - [Testing](#testing)
 - [Team](#team)
 - [Roadmap](#roadmap)
@@ -48,8 +52,8 @@ The work is delivered in two phases:
 
 | Phase | Focus | State |
 |-------|-------|-------|
-| **Advanced ML** | Leakage-safe data pipeline, feature engineering, classical classifiers, calibrated evaluation | In progress |
-| **Deep Learning** | Learned entity embeddings and temporal modelling, benchmarked against the Advanced ML baseline | Planned |
+| **Advanced ML** | Leakage-safe data pipeline, feature engineering, classical classifiers, calibrated evaluation and offline rescheduling what-if | Complete |
+| **Deep Learning** | Learned entity embeddings and temporal modelling, benchmarked against the Advanced ML baseline | In Planning |
 
 ---
 
@@ -213,27 +217,105 @@ Selected findings:
 
 ---
 
+## Results Summary
+
+Two classifiers are trained and compared under the frozen chronological
+protocol: a class-balanced Logistic Regression and a tuned XGBoost. Both are
+calibrated on a held-out late-training window (isotonic selected by validation
+Brier), with operating thresholds frozen on validation before the one-time test.
+Full methodology, calibration study, paired uncertainty intervals and a
+proper-score audit are in [evaluation_results.md](docs/evaluation_results.md) and
+[evaluation_audit.md](docs/evaluation_audit.md).
+
+**Validation (development set, 50,466 flights, delay prevalence 0.156)**
+
+| Model | Threshold | PR-AUC | ROC-AUC | Precision | Recall | F1 | Brier |
+|-------|----------:|-------:|--------:|----------:|-------:|---:|------:|
+| Balanced Logistic Regression | 0.344 | 0.223 | 0.636 | 0.224 | 0.605 | 0.327 | 0.151 |
+| Tuned XGBoost | 0.250 | 0.213 | 0.628 | 0.216 | 0.593 | 0.317 | 0.137 |
+
+**Held-out test (one-time frozen evaluation, 48,581 flights, prevalence 0.269)**
+
+| Model | PR-AUC | ROC-AUC | Precision | Recall | F1 |
+|-------|-------:|--------:|----------:|-------:|---:|
+| Balanced Logistic Regression | 0.294 | 0.544 | 0.296 | 0.488 | 0.369 |
+| Tuned XGBoost | 0.337 | 0.599 | 0.335 | 0.532 | 0.411 |
+
+XGBoost is the stronger descriptive held-out candidate on PR-AUC, ROC-AUC,
+precision, recall and F1. Discrimination is modest in absolute terms (ROC-AUC
+≈ 0.60), and the evaluation audit shows the calibrated probabilities are not
+convincingly better than a prevalence baseline on proper scores. No
+production-readiness claim is made; prevalence differs between validation and
+test, so their metrics are not directly comparable.
+
+---
+
+## Rescheduling What-If Analysis
+
+The second half of the project's expected deliverable: an **offline, assumption-
+explicit** analysis of whether the calibrated probabilities can drive a proactive
+rescheduling rule. Full method, assumptions and limitations are in
+[rescheduling_analysis.md](docs/rescheduling_analysis.md); the logic lives in
+[`rescheduling.py`](src/flight_delay/evaluation/rescheduling.py) and runs via
+[`scripts/rescheduling_analysis.py`](scripts/rescheduling_analysis.py).
+
+Given per-flight costs — `C_d` for an unmitigated delay, `C_a` for taking an
+action, and recovery `r` for the share of delay cost avoided when acting on a
+true delay — the net saving versus doing nothing has a closed form,
+
+```
+net_savings = tp · (r·C_d − C_a) − fp · C_a
+```
+
+and the **cost-optimal action threshold is `τ* = C_a / (r·C_d)`**. The decision
+boundary is therefore read directly off the cost assumptions, which is precisely
+why calibration matters operationally.
+
+Because no real intervention cost is approved, results are a sensitivity sweep
+over the cost ratio `C_a/C_d` (recovery fixed at 0.8), run on the validation
+partition so the held-out test is preserved:
+
+| `C_a/C_d` | `τ*` | Balanced LR — beats no-action? | Tuned XGBoost — beats no-action? |
+|----------:|-----:|:------------------------------:|:--------------------------------:|
+| 0.05 | 0.063 | ✓ (+0.075/flt) | ✓ (+0.075/flt) |
+| 0.10 | 0.125 | ✓ (+0.025/flt) | ✓ (+0.034/flt) |
+| 0.15 | 0.188 | ✗ (−0.016/flt) | ✓ (+0.005/flt) |
+| 0.25 | 0.313 | ✗ (−0.056/flt) | ✗ (−0.018/flt) |
+
+**Findings.** A model-driven rescheduling rule pays off only when interventions
+are cheap relative to a delay — up to `C_a/C_d ≈ 0.10` for Logistic Regression
+and `≈ 0.15` for XGBoost. Under moderate costs, neither model beats doing nothing,
+because low precision makes false-alarm costs dominate. **XGBoost dominates
+Logistic Regression across the whole sweep** (wider positive-savings region,
+higher oracle efficiency), a decision-relevant reason to prefer it that the
+ranking metrics alone did not surface.
+
+---
+
 ## Repository Structure
 
 ```text
 flight-delay-prediction/
 ├── configs/            Pipeline and model configuration (config.yaml)
 ├── data/
-│   ├── raw/            Source dataset
-│   ├── interim/        Intermediate artifacts
-│   └── processed/      Model-ready datasets
-├── docs/               Data contract, feature policy, dictionaries
+│   ├── raw/            Source dataset (flights.csv)
+│   ├── interim/        Intermediate artifacts (ignored)
+│   └── processed/      Model-ready datasets (ignored)
+├── docs/               Data contract, dictionaries, feature/eval/rescheduling reports
 ├── models/             Saved model artifacts (ignored)
-├── notebooks/          Exploratory analysis
+├── notebooks/          EDA, logistic regression, XGBoost, evaluation
 ├── reports/
 │   ├── figures/        EDA visualizations
-│   └── results/        Evaluation outputs
+│   ├── results/        Model comparison outputs (ignored)
+│   └── evaluation/     Calibrated predictions, metrics, rescheduling (ignored, regenerable)
+├── scripts/            compare_models, audit, calibration, rescheduling_analysis CLIs
 ├── src/flight_delay/
-│   ├── data/           load, target, split, pipeline, audit
-│   ├── features/       temporal, route, historical, selection
-│   ├── models/         Classifier implementations (modelling phase)
-│   └── evaluation/     Metrics and calibration (evaluation phase)
-└── tests/              Automated test suite
+│   ├── data/           load, target, split, pipeline, audit, prepare
+│   ├── features/       temporal, route, historical, selection, target, model_features
+│   ├── models/         logistic, xgboost_model
+│   └── evaluation/     metrics, calibration, thresholds, predictions, evaluate,
+│                       rescheduling, baselines, run_state, plots
+└── tests/              Automated test suite (218 tests)
 ```
 
 ---
@@ -264,6 +346,76 @@ settings — is centralized in [`configs/config.yaml`](configs/config.yaml).
 
 ---
 
+## Reproducing the Full Pipeline
+
+The complete Advanced ML phase runs end to end from the raw dataset. Run from the
+repository root with the package installed.
+
+```bash
+# 1. Model-to-model comparison on the chronological validation split
+python scripts/compare_models.py --n-jobs 4
+
+# 2. Frozen evaluation — refit early-training bases, calibrate on late training,
+#    freeze calibration + thresholds on validation (writes reports/evaluation/)
+python -m flight_delay.evaluation.evaluate validation \
+  --data data/raw/flights.csv --output-dir reports/evaluation --n-jobs 4
+
+# 3. Offline rescheduling what-if over the selected calibrated predictions
+python scripts/rescheduling_analysis.py --eval-dir reports/evaluation \
+  --cost-ratio 0.25 --recovery 0.8
+
+# 4. One-time held-out test — only after reviewing reports/evaluation/selection.json
+python -m flight_delay.evaluation.evaluate final-test \
+  --data data/raw/flights.csv --output-dir reports/evaluation
+```
+
+> The final-test stage is guarded by persistent exclusive markers: a started test
+> phase cannot be silently retried. Do **not** rerun the real final test merely to
+> check implementation changes. On macOS, XGBoost needs OpenMP (`brew install
+> libomp`). The supplementary calibration and audit commands are listed under
+> [Evaluation and supplementary audits](#evaluation-and-supplementary-audits).
+
+---
+
+## Documentation Index
+
+| Document | Contents |
+|----------|----------|
+| [data_contract.md](docs/data_contract.md) | Prediction-time contract and excluded post-departure fields |
+| [data_dictionary.md](docs/data_dictionary.md) | Every raw and engineered column |
+| [feature_policy.md](docs/feature_policy.md) | Rules separating model inputs from the target |
+| [feature_analysis.md](docs/feature_analysis.md) | Feature-level findings and rationale |
+| [historical_features.md](docs/historical_features.md) | Prior-date historical protocol and availability caveat |
+| [xgboost_methodology.md](docs/xgboost_methodology.md) | XGBoost training and tuning protocol |
+| [xgboost_results.md](docs/xgboost_results.md) | Selected hyperparameters and validation results |
+| [model_comparison.md](docs/model_comparison.md) | Logistic Regression vs XGBoost comparison |
+| [evaluation_results.md](docs/evaluation_results.md) | Calibration, thresholds, paired uncertainty, held-out test |
+| [evaluation_audit.md](docs/evaluation_audit.md) | Reproduction, proper-score audit and remaining limitations |
+| [rescheduling_analysis.md](docs/rescheduling_analysis.md) | Offline rescheduling what-if, assumptions and sensitivity |
+
+---
+
+## Reports and Generated Artifacts
+
+All data, model and evaluation artifacts are regenerable and Git-ignored
+(see [`.gitignore`](.gitignore)); only the committed EDA figures and the
+documentation above are tracked.
+
+| Location | Produced by | Contents |
+|----------|-------------|----------|
+| `reports/figures/*.png` | `notebooks/01_data_exploration.ipynb` | Committed EDA visualizations |
+| `reports/results/` | `scripts/compare_models.py` | Validation model-comparison CSV |
+| `reports/evaluation/*.csv` | `evaluate validation` / `final-test` | Aligned predictions and operating curves |
+| `reports/evaluation/*.json` | `evaluate` | Metrics, bootstrap, and frozen `selection.json` provenance |
+| `reports/evaluation/figures/` | `evaluate` | ROC, PR, reliability, confusion and proper-score plots |
+| `reports/evaluation/frozen.joblib` | `evaluate validation` | Frozen bases, calibrators and thresholds |
+| `reports/evaluation/rescheduling/` | `scripts/rescheduling_analysis.py` | What-if JSON reports, cost-ratio sweep, net-benefit curves and figures |
+
+The raw dataset is expected at `data/raw/flights.csv` (the Kaggle 2013 US flights
+starter dataset); it is the only tracked file under `data/`.
+
+---
+
 ## Testing
 
 The suite covers data loading, target construction, the chronological split,
@@ -291,34 +443,15 @@ versions and remaining limitations.
 
 | Member | Role |
 |--------|------|
-| Samiksha Jangid | Team Lead — Data Pipeline and Leakage Prevention |
-| Rashmi Anand | Exploratory Data Analysis and Feature Engineering |
-| Ankit Raj Singh | Logistic Regression |
-| Shubhaang Kataruka | XGBoost and Hyperparameter Tuning |
-| Lakshya | Evaluation and Calibration |
+| Samiksha Jangid (2401010410) | Team Lead — Data Pipeline and Leakage Prevention |
+| Rashmi Anand (2401010374)| Exploratory Data Analysis and Feature Engineering |
+| Ankit Raj Singh (2401010075)| Logistic Regression |
+| Shubhaang Kataruka (2401010450) | XGBoost and Hyperparameter Tuning |
+| Lakshya (2401020036)| Evaluation and Calibration |
 
 ---
 
-## Roadmap
 
-**Advanced ML phase**
-
-- [x] Prior-date historical pipeline and chronological validation (availability caveat documented)
-- [x] Temporal, route, and historical feature engineering
-- [x] Exploratory data analysis
-- [x] Automated test suite
-- [x] Logistic Regression baseline
-- [x] XGBoost classifier with hyperparameter tuning
-- [x] PR-AUC, ROC-AUC, precision and recall reporting
-- [x] Probability calibration and operational threshold analysis
-- [ ] Offline rescheduling impact analysis
-
-**Deep Learning phase**
-
-- [ ] Learned airline embeddings
-- [ ] Origin and destination embeddings
-- [ ] Temporal sequence modelling
-- [ ] Benchmark against the Advanced ML baseline
 
 ---
 
