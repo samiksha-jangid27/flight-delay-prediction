@@ -125,9 +125,11 @@ behaviour across learners. We evaluate raw, sigmoid and isotonic variants and
 select by a proper scoring rule.
 
 \textbf{Evaluation under imbalance.} For skewed classes, precision--recall
-analysis is more informative than ROC alone~\cite{davis,saito}. We therefore
-report PR-AUC as the primary ranking metric alongside ROC-AUC and proper scores
-(Brier, log loss). All estimators use the scikit-learn and XGBoost
+analysis is more informative than ROC alone~\cite{davis,saito}, because the ROC
+curve can look optimistic when the negative class dominates. We therefore
+report PR-AUC as the primary ranking metric, alongside ROC-AUC and the proper
+scores (Brier, log loss) that also drive our calibration selection. All
+estimators use the standard scikit-learn and XGBoost
 implementations~\cite{sklearn,xgboost}.
 
 \textbf{Decision analysis.} Translating probabilities into actions under explicit
@@ -163,7 +165,8 @@ approximately $26\%$, but it is strongly seasonal, so the chronological
 partitions differ in prevalence (Section~\ref{sec:method}).
 
 Exploratory analysis, conducted on the training partition only, surfaces the
-structure the features are designed to exploit (Figs.~\ref{fig:target}--\ref{fig:carrier}):
+structure the features are designed to exploit
+(Figs.~\ref{fig:target}--\ref{fig:distance}):
 \begin{itemize}
   \item \textbf{Time of day.} Delay risk rises monotonically from roughly
   $10.5\%$ for early-morning departures to about $40\%$ late in the evening, as
@@ -173,7 +176,13 @@ structure the features are designed to exploit (Figs.~\ref{fig:target}--\ref{fig
   \item \textbf{Day of week.} Weekdays ($27.8\%$) exceed weekends ($20.4\%$).
   \item \textbf{Carrier.} Delay propensity varies widely by operator, from
   $\approx 14\%$ to $\approx 41\%$.
-  \item \textbf{Origin.} EWR ($27.9\%$) $>$ JFK ($25.5\%$) $>$ LGA ($24.0\%$).
+  \item \textbf{Origin.} EWR ($27.9\%$) $>$ JFK ($25.5\%$) $>$ LGA ($24.0\%$),
+  and delay risk also varies sharply at the finer route level
+  (Fig.~\ref{fig:originroute}).
+  \item \textbf{Distance.} Delay rate is largely flat across distance bands and
+  dips only for the longest hauls (Fig.~\ref{fig:distance}), confirming that raw
+  distance is a weak standalone signal and motivating the route and historical
+  features instead.
 \end{itemize}
 
 \begin{figure}[t]
@@ -198,6 +207,25 @@ structure the features are designed to exploit (Figs.~\ref{fig:target}--\ref{fig
   \caption{Delay rate by carrier. Operator-level variation motivates the
   carrier historical-delay features.}
   \label{fig:carrier}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{delay-origin-route}
+  \caption{Delay rate by origin airport (left) and across the fifteen busiest
+  origin$\rightarrow$destination routes (right), each against the overall base
+  rate (dashed). Route-level spread of roughly $19\%$ to $29\%$ motivates the
+  route and route-historical features.}
+  \label{fig:originroute}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.82\columnwidth]{delay-distance}
+  \caption{Delay rate by binned flight distance. The near-flat profile shows
+  distance alone carries little signal, so it enters only as context for the
+  route encoding.}
+  \label{fig:distance}
 \end{figure}
 
 \section{Feature Engineering}
@@ -229,7 +257,8 @@ benefit.
 Static route descriptors encode the corridor and its length: the
 origin$\rightarrow$destination identifier, a binned \code{distance\_band}, a
 long-haul flag ($\geq 1500$ miles) and $\log(1+\text{distance})$ to compress the
-heavy tail. These are fixed regardless of outcome and so introduce no leakage.
+heavy tail (the raw distance signal being weak, Fig.~\ref{fig:distance}). These
+are fixed regardless of outcome and so introduce no leakage.
 
 \subsection{Historical delay features}
 For each carrier, origin, destination and route we compute a historical delay
@@ -237,9 +266,21 @@ rate and flight count from \emph{previous calendar dates only}, using a shifted
 cumulative aggregation so that same-day and future observations are never
 included. These prior-date rates correlate with the target and summarise
 congestion and operational reliability that the static features cannot.
+Among them, the carrier and route prior-date rates correlate most strongly with
+the target (Fig.~\ref{fig:histcorr}), consistent with the operator- and
+corridor-level structure seen in the exploratory analysis.
 We document openly that this guarantees prior-date ordering but not the
 \emph{exact} availability of each outcome at the precise prediction instant;
 availability-time leakage therefore remains a stated caveat.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.9\columnwidth]{hist-correlation}
+  \caption{Pearson correlation of each prior-date historical delay rate with the
+  target on the training partition. Carrier- and route-level histories are the
+  most informative.}
+  \label{fig:histcorr}
+\end{figure}
 
 \subsection{The pre-departure allowlist}
 A single feature contract admits only approved predictors
@@ -286,6 +327,13 @@ Two classifiers share the identical training rows and feature contract:
   subsample $0.75$, $L_2$ regularisation $10$, and
   \code{scale\_pos\_weight}$\,\approx 2.86$ for imbalance.
 \end{itemize}
+This XGBoost configuration was selected by \code{RandomizedSearchCV} over eight
+sampled candidates on the \emph{training data only}, scored with three expanding
+chronological folds grouped by whole flight dates and separated by a one-date
+embargo so that no fold shares a date across the train/validation boundary. The
+search ranged over tree count, depth, learning rate, minimum child weight, row
+and column subsampling, $L_2$ regularisation and positive-class weighting; the
+held-out test set was never consulted.
 
 \subsection{Calibration}
 Each model's calibration-window scores are mapped by three candidates---raw
@@ -311,14 +359,33 @@ Table~\ref{tab:val} reports validation performance at the frozen thresholds with
 the selected (isotonic) calibration for both models. Ranking is similar; both
 models have low precision ($\approx 22\%$) at their operating points, reflecting
 the difficulty of the task. ROC and PR curves appear in
-Figs.~\ref{fig:roc}--\ref{fig:pr}.
+Figs.~\ref{fig:roc}--\ref{fig:pr}, and the confusion matrices at the frozen
+thresholds in Fig.~\ref{fig:confusion}. On validation alone the balanced LR in
+fact edges XGBoost on PR-AUC and ROC-AUC, but the two differences are tiny and,
+as the date-block bootstrap below shows, not statistically distinguishable; we
+therefore defer the model choice to the held-out test
+(Section~\ref{sec:results}\,C), where XGBoost is the stronger candidate on every
+metric. Both operating points favour recall over precision---catching
+roughly $60\%$ of true delays at the cost of a large false-alarm count
+(Fig.~\ref{fig:confusion})---which is the intended behaviour under class
+weighting and is exactly what the cost analysis of Section~\ref{sec:resched}
+later prices.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{confusion}
+  \caption{Validation confusion matrices at the frozen operating thresholds.
+  Both models recover a majority of true delays (high recall) while incurring
+  many false positives, consistent with their low operating precision.}
+  \label{fig:confusion}
+\end{figure}
 
 \begin{table}[t]
   \caption{Validation metrics (isotonic calibration; frozen thresholds).}
   \label{tab:val}
   \centering
-  \small
   \setlength{\tabcolsep}{4pt}
+  \resizebox{\columnwidth}{!}{%
   \begin{tabular}{lrrrrrr}
     \toprule
     Model & Thr. & PR-AUC & ROC-AUC & Prec. & Rec. & Brier \\
@@ -326,7 +393,7 @@ Figs.~\ref{fig:roc}--\ref{fig:pr}.
     Balanced LR    & $0.344$ & $0.223$ & $0.636$ & $0.224$ & $0.605$ & $0.151$ \\
     Tuned XGBoost  & $0.250$ & $0.213$ & $0.628$ & $0.216$ & $0.593$ & $0.137$ \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
 \end{table}
 
 \begin{figure}[t]
@@ -376,8 +443,8 @@ is descriptive rather than statistically established.
   \caption{Held-out test metrics (frozen one-time evaluation).}
   \label{tab:test}
   \centering
-  \small
   \setlength{\tabcolsep}{4pt}
+  \resizebox{\columnwidth}{!}{%
   \begin{tabular}{lrrrrr}
     \toprule
     Model & PR-AUC & ROC-AUC & Prec. & Rec. & $F_1$ \\
@@ -385,8 +452,27 @@ is descriptive rather than statistically established.
     Balanced LR    & $0.294$ & $0.544$ & $0.296$ & $0.488$ & $0.369$ \\
     Tuned XGBoost  & $\mathbf{0.337}$ & $\mathbf{0.599}$ & $\mathbf{0.335}$ & $\mathbf{0.532}$ & $\mathbf{0.411}$ \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
 \end{table}
+
+\subsection{Feature importance}
+The tuned XGBoost model's gain-importance ranking (Fig.~\ref{fig:importance})
+is dominated by time-of-day signals: scheduled \code{hour} and
+\code{sched\_dep\_time} together account for the largest share, followed by the
+cyclic month and hour encodings and the \code{season} flag. This agrees with the
+exploratory finding that delay risk is primarily driven by when a flight departs
+(Figs.~\ref{fig:hourmonth}), and confirms that the engineered temporal features
+carry real model weight rather than mere decoration. Importance here is
+model-relative and does not imply causation; correlated calendar features can
+share or dilute one another's attributed gain.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.95\columnwidth]{xgb-importance}
+  \caption{XGBoost gain importance for the ten most influential encoded
+  features. Time-of-day terms dominate, matching the exploratory structure.}
+  \label{fig:importance}
+\end{figure}
 
 \section{Offline Rescheduling What-If Analysis}
 \label{sec:resched}
@@ -480,7 +566,17 @@ the current probabilities can deliver.
 The results are deliberately unembellished. Discrimination is modest
 (ROC-AUC $\approx 0.60$), the calibrated probabilities barely improve on a
 prevalence baseline in proper-score terms, and the between-model difference is
-not statistically established. The rescheduling analysis shows a genuine but
+not statistically established. This ceiling is, however, largely expected rather
+than a modelling failure: by construction the predictor sees only schedule,
+route and prior-date history, and is denied the single strongest driver of
+day-of-operation delay---weather---together with real-time congestion and
+upstream-aircraft state, none of which is available at the pre-departure
+decision point we committed to. The gain-importance ranking
+(Fig.~\ref{fig:importance}) reflects exactly this: the model extracts what
+temporal and historical structure it can, but that structure bounds how far any
+pre-departure classifier on this feature set can go. We therefore read
+ROC-AUC $\approx 0.60$ as an honest estimate of the information actually present
+before departure, not as an artefact of weak modelling. The rescheduling analysis shows a genuine but
 narrow operating regime. Key limitations: (i) historical features guarantee
 prior-date ordering but not exact availability-time safety; (ii) the data cover a
 single year and only three New York origin airports, limiting generalisation;
@@ -507,9 +603,11 @@ test of generalisation.
 \section*{Reproducibility}
 The pipeline, models, evaluation and rescheduling analysis are implemented as a
 tested Python package (\code{random\_seed}$=42$), with $218$ passing automated
-tests and a continuous-integration workflow. The frozen evaluation records
-dataset and artifact hashes and dependency versions; the final test stage is
-guarded so it cannot be silently re-run.
+tests and a continuous-integration workflow. The frozen evaluation records the
+dataset and artifact SHA-256 hashes and the exact dependency versions, so a
+reviewer can confirm that the reported numbers came from the committed data and
+code; the final test stage is additionally guarded so it cannot be silently
+re-run or re-selected.
 
 \begin{thebibliography}{00}
 \bibitem{bts} US Bureau of Transportation Statistics, ``Airline On-Time
