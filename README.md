@@ -24,6 +24,7 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 - [Overview](#overview)
 - [Problem Definition](#problem-definition)
 - [System Architecture](#system-architecture)
+- [Project Workflow — What We Did, Stage by Stage](#project-workflow--what-we-did-stage-by-stage)
 - [Feature Engineering](#feature-engineering)
 - [Exploratory Data Analysis](#exploratory-data-analysis)
 - [Results Summary](#results-summary)
@@ -80,35 +81,71 @@ chronologically separated datasets. Date ordering is enforced; this alone does
 not establish outcome availability at the actual prediction time.
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[Raw flights.csv] --> B[Load and validate]
-    B --> C[Create binary target<br/>arr_delay >= 15 min]
-    C --> D[Historical delay features<br/>past dates only]
-    D --> E[Chronological split<br/>70 / 15 / 15]
-    E --> F[Train]
-    E --> G[Validation]
-    E --> H[Test]
+    B --> C[Schedule-load features<br/>ablation only, complete timetable]
+    C --> D[Create binary target<br/>arr_delay >= 15 min<br/>drop undefined outcomes]
+    D --> E[Temporal, route and prior-date features]
+    E --> F[Chronological split<br/>70 / 15 / 15 by calendar date]
+    F --> G[Base training dates]
+    F --> H[Late-training calibration dates]
+    F --> I[Validation]
+    F --> J[Test]
+    G --> K[Fit 31-feature model]
+    K --> L[Fit candidate calibrators]
+    H --> L
+    L --> M[Select calibration and threshold<br/>using validation]
+    I --> M
+    M --> N[Frozen model, calibrator and threshold]
+    N --> O[Final test evaluation]
+    J --> O
+    M --> P[Validation-only rescheduling analysis]
 
-    F --> I[Feature selection<br/>drop post-departure columns]
-    G --> I
-    H --> I
-    I --> J[Model training<br/>Logistic Regression / XGBoost]
-    J --> K[Calibrated evaluation<br/>and threshold analysis]
-
-    style D fill:#e8f0fe,stroke:#4285f4
+    style C fill:#f1f3f4,stroke:#9aa0a6
     style E fill:#e8f0fe,stroke:#4285f4
-    style I fill:#e8f0fe,stroke:#4285f4
-    style J fill:#f1f3f4,stroke:#9aa0a6,stroke-dasharray: 4 4
-    style K fill:#f1f3f4,stroke:#9aa0a6,stroke-dasharray: 4 4
+    style F fill:#e8f0fe,stroke:#4285f4
+    style K fill:#e8f0fe,stroke:#4285f4
+    style M fill:#e8f0fe,stroke:#4285f4
+    style N fill:#f1f3f4,stroke:#9aa0a6
+    style O fill:#f1f3f4,stroke:#9aa0a6
 ```
 
-> The pipeline, Logistic Regression, tuned XGBoost, calibration and evaluation
-> are implemented. The diagram colors group stages; they do not indicate completion.
+> The gray schedule-load step is a validation-only feature ablation; its counts
+> use the **complete schedule before** undefined-outcome rows are dropped. The
+> canonical model uses 31 features without these congestion columns. Historical
+> features use **prior calendar dates only**. Calibration is fitted on a
+> late-training window, selected with validation, and the test split is used
+> only after choices are frozen. The diagram colors group stages; they do not
+> indicate completion.
 
 The orchestration lives in
 [`pipeline.py`](src/flight_delay/data/pipeline.py), and the chronological
 split — partitioned by unique calendar date, not by row — is in
 [`split.py`](src/flight_delay/data/split.py).
+
+---
+
+## Project Workflow — What We Did, Stage by Stage
+
+The full journey from raw data to a cost-based decision rule. Each stage lists
+what we did, where the code lives, and where the written result is.
+
+| # | Stage | What we did | Code | Write-up |
+|---|-------|-------------|------|----------|
+| 1 | **Data loading & cleaning** | Loaded 336,776 raw 2013 NYC-origin flights; validated the schema; dropped 9,430 rows with an undefined arrival outcome (no imputation) → **327,346 usable** rows. | [`load.py`](src/flight_delay/data/load.py), [`target.py`](src/flight_delay/features/target.py) | [data_contract.md](docs/data_contract.md), [data_dictionary.md](docs/data_dictionary.md) |
+| 2 | **Exploratory data analysis** | On the **training partition only**, quantified the drivers of delay: time-of-day (~10.5% → ~40%), season, carrier, origin and route spread, and the flat distance profile. Produced the committed EDA figures. | [`01_data_exploration.ipynb`](notebooks/01_data_exploration.ipynb) | [feature_analysis.md](docs/feature_analysis.md) + figures below |
+| 3 | **Feature engineering** | Built four leakage-safe engines: cyclic temporal, static route, prior-date historical aggregates, and schedule-based congestion proxies. Enforced a pre-departure allowlist. **31-feature** canonical set; **33-feature** congestion variant. | [`features/`](src/flight_delay/features/) | [feature_policy.md](docs/feature_policy.md), [historical_features.md](docs/historical_features.md) |
+| 4 | **Chronological split & calibration windows** | Split by **calendar date** 70/15/15; split training again in time into a base-train window (fit models) and a late-training calibration window (fit calibrators). | [`split.py`](src/flight_delay/data/split.py), [`prepare.py`](src/flight_delay/data/prepare.py) | report §Methodology |
+| 5 | **Logistic Regression baseline** | Trained class-balanced Logistic Regression on the shared pipeline and feature contract. | [`logistic.py`](src/flight_delay/models/logistic.py), [`03_logistic_regression.ipynb`](notebooks/03_logistic_regression.ipynb) | [model_comparison.md](docs/model_comparison.md) |
+| 6 | **XGBoost tuning** | Tuned XGBoost with `RandomizedSearchCV` over expanding, date-grouped, embargoed chronological folds on **training data only** (250 trees, depth 6, lr 0.03, …). | [`xgboost_model.py`](src/flight_delay/models/xgboost_model.py), [`04_xgboost.ipynb`](notebooks/04_xgboost.ipynb) | [xgboost_methodology.md](docs/xgboost_methodology.md), [xgboost_results.md](docs/xgboost_results.md) |
+| 7 | **Calibration & threshold selection** | Compared raw / sigmoid / isotonic maps, selecting isotonic by validation Brier; froze one operating threshold per model by validation F1. | [`calibration.py`](src/flight_delay/evaluation/calibration.py), [`thresholds.py`](src/flight_delay/evaluation/thresholds.py) | [evaluation_results.md](docs/evaluation_results.md) |
+| 8 | **Frozen held-out evaluation** | Froze estimators, calibrators, thresholds, dataset hash and versions to disk, then ran the guarded one-shot test. Added a paired date-block bootstrap (300 resamples) and a proper-score audit vs a prevalence baseline. | [`evaluate.py`](src/flight_delay/evaluation/evaluate.py), [`baselines.py`](src/flight_delay/evaluation/baselines.py) | [canonical_evaluation.json](docs/canonical_evaluation.json), [evaluation_audit.md](docs/evaluation_audit.md), [`05_model_evaluation.ipynb`](notebooks/05_model_evaluation.ipynb) |
+| 9 | **Congestion ablation** | Ran a controlled with/without-congestion comparison on **validation only** (31 vs 33 features); marginal AP change was negligible (≈ ±0.0005). | [`congestion_ablation.py`](scripts/congestion_ablation.py) | [congestion_ablation.json](docs/congestion_ablation.json) |
+| 10 | **Decision analysis (rescheduling)** | Derived a closed-form net-benefit and cost-optimal threshold `τ* = C_a/(r·C_d)`; swept the cost ratio on validation to find where acting beats inaction. | [`rescheduling.py`](src/flight_delay/evaluation/rescheduling.py), [`rescheduling_analysis.py`](scripts/rescheduling_analysis.py) | [rescheduling_analysis.md](docs/rescheduling_analysis.md) |
+| 11 | **Reproducibility & tests** | 224 automated tests (217 synthetic in CI + 7 real-data locally); dataset SHA-256 and dependency versions pinned in the manifest; final-test stage guarded against silent reruns. | [`tests/`](tests/) | [evaluation_audit.md](docs/evaluation_audit.md) |
+
+The runnable commands for stages 5–10 are in
+[Reproducing the Full Pipeline](#reproducing-the-full-pipeline).
 
 ---
 
@@ -308,17 +345,21 @@ partition so the held-out test is preserved:
 | 0.05 | 0.063 | ✓ (+0.075/flt) | ✓ (+0.075/flt) |
 | 0.10 | 0.125 | ✓ (+0.025/flt) | ✓ (+0.034/flt) |
 | 0.15 | 0.188 | ✗ (−0.016/flt) | ✓ (+0.005/flt) |
-| 0.25 | 0.313 | ✗ (−0.049/flt) | ✗ (−0.020/flt) |
+| 0.20 | 0.250 | ✗ (−0.049/flt) | ✗ (−0.012/flt) |
+| 0.25 | 0.313 | ✗ (−0.056/flt) | ✗ (−0.018/flt) |
+| 0.30 | 0.375 | ✓ (+0.0001/flt, degenerate) | ✗ (−0.021/flt) |
 
 **Findings.** A model-driven rescheduling rule pays off only when interventions
 are cheap relative to a delay — up to `C_a/C_d ≈ 0.10` for Logistic Regression
 and `≈ 0.15` for XGBoost. Under moderate costs, neither model beats doing nothing,
 because low precision makes false-alarm costs dominate. **XGBoost has the more
 favourable cost-sensitivity profile across the meaningful range** (wider
-contiguous positive-savings region, higher oracle efficiency), with one isolated
-degenerate exception at the highest cost ratios where both models act on almost
-nothing — a decision-relevant reason to prefer XGBoost that the ranking metrics
-alone did not surface.
+contiguous positive-savings region, higher oracle efficiency) — a decision-relevant
+reason to prefer XGBoost that the ranking metrics alone did not surface. The single
+exception is the degenerate high-cost point `C_a/C_d = 0.30`, where Logistic
+Regression shows a negligible positive saving (+0.0001/flt) only because its
+calibrated scores rarely clear the high threshold, so it acts on almost no flights;
+this is not a meaningful reversal.
 
 ---
 
