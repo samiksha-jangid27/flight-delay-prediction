@@ -1,7 +1,5 @@
 %% Flight Delay Prediction --- Advanced Machine Learning Phase (Project 21, Team T022)
 %% IEEE conference-style report. Compiles with pdflatex (IEEEtran class).
-%% Build:  pdflatex main  ->  pdflatex main   (run twice for references/labels)
-%% Or upload this folder to Overleaf and select pdfLaTeX.
 
 \documentclass[conference]{IEEEtran}
 \IEEEoverridecommandlockouts
@@ -14,8 +12,17 @@
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xcolor}
+\usepackage{microtype}
 
 \graphicspath{{figures/}}
+
+% Keep columns tidy and reduce awkward spacing/overfull lines.
+\emergencystretch=1.5em
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{7pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{3pt}
+\setlength{\belowcaptionskip}{0pt}
 
 % Convenience macros for feature names with underscores.
 \newcommand{\code}[1]{\texttt{#1}}
@@ -111,38 +118,38 @@ weaknesses over optimistic claims.
 \section{Related Work}
 \label{sec:related}
 \textbf{Flight delay prediction.} Delay modelling spans queuing and network
-propagation models~\cite{rebollo} through to data-driven machine learning on
-large operational records~\cite{gui}. The US Bureau of Transportation Statistics
+propagation models through to data-driven machine learning on
+large operational records. The US Bureau of Transportation Statistics
 (BTS) defines the fifteen-minute threshold for a ``delayed'' flight and publishes
 the on-time performance data that underpins much of this
-literature~\cite{bts}. Our work adopts the BTS threshold and the pre-departure
+literature. Our work adopts the BTS threshold and the pre-departure
 constraint but deliberately restricts itself to a compact, reproducible
 single-year dataset for the baseline phase.
 
 \textbf{Gradient boosting.} Gradient-boosted decision trees, and XGBoost in
-particular~\cite{xgboost}, are strong tabular learners that capture non-linear
+particular, are strong tabular learners that capture non-linear
 feature interactions with modest tuning, making them a natural comparator to a
 linear baseline.
 
-\textbf{Probability calibration.} Guo \emph{et al.}~\cite{guo} show that modern
+\textbf{Probability calibration.} Guo \emph{et al.} show that modern
 classifiers are frequently miscalibrated and that post-hoc recalibration is
 often necessary. Classic post-hoc methods include Platt scaling (a sigmoid
-fit)~\cite{platt} and isotonic regression (a non-parametric monotone
-map)~\cite{zadrozny}; Niculescu-Mizil and Caruana~\cite{niculescu} compare their
+fit) and isotonic regression (a non-parametric monotone
+map); Niculescu-Mizil and Caruana compare their
 behaviour across learners. We evaluate raw, sigmoid and isotonic variants and
 select by a proper scoring rule.
 
 \textbf{Evaluation under imbalance.} For skewed classes, precision--recall
-analysis is more informative than ROC alone~\cite{davis,saito}, because the ROC
+analysis is more informative than ROC alone, because the ROC
 curve can look optimistic when the negative class dominates. We therefore
 report scikit-learn Average Precision (AP) as the primary ranking metric,
 alongside ROC-AUC and the proper
 scores (Brier, log loss) that also drive our calibration selection. All
 estimators use the standard scikit-learn and XGBoost
-implementations~\cite{sklearn,xgboost}.
+implementations.
 
 \textbf{Decision analysis.} Translating probabilities into actions under explicit
-costs is the subject of decision curve analysis~\cite{vickers}, which plots net
+costs is the subject of decision curve analysis, which plots net
 benefit against the threshold probability. Our rescheduling analysis generalises
 this net-benefit view with an explicit recovery factor for partially mitigated
 delays.
@@ -179,7 +186,7 @@ than hiding it, as a random split would. Because precision--recall metrics depen
 on positive prevalence, we therefore do not read cross-partition PR differences as
 improvements (Section~\ref{sec:results}).
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{prevalence-shift}
   \caption{Delay prevalence by partition (left) and the 2013 monthly delay-rate
@@ -209,7 +216,7 @@ structure the features are designed to exploit
   features instead.
 \end{itemize}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.78\columnwidth]{target-distribution}
   \caption{Target class balance: delayed versus on-time arrivals. The minority
@@ -217,7 +224,7 @@ structure the features are designed to exploit
   \label{fig:target}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{delay-hour-month}
   \caption{Delay rate by scheduled hour and month, exposing the strong
@@ -225,7 +232,7 @@ structure the features are designed to exploit
   \label{fig:hourmonth}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{delay-carrier}
   \caption{Delay rate by carrier. Operator-level variation motivates the
@@ -233,7 +240,7 @@ structure the features are designed to exploit
   \label{fig:carrier}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{delay-origin-route}
   \caption{Delay rate by origin airport (left) and across the fifteen busiest
@@ -243,7 +250,7 @@ structure the features are designed to exploit
   \label{fig:originroute}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.82\columnwidth]{delay-distance}
   \caption{Delay rate by binned flight distance. The near-flat profile shows
@@ -272,7 +279,7 @@ x \mapsto \left(\sin\tfrac{2\pi x}{P},\ \cos\tfrac{2\pi x}{P}\right),
 restores the true adjacency (Fig.~\ref{fig:cyclic}); linear models in particular
 benefit.
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.82\columnwidth]{cyclic-hour}
   \caption{Cyclic hour encoding: hour $23$ sits adjacent to hour $0$ on the
@@ -300,7 +307,7 @@ We document openly that this guarantees prior-date ordering but not the
 \emph{exact} availability of each outcome at the precise prediction instant;
 availability-time leakage therefore remains a stated caveat.
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.9\columnwidth]{hist-correlation}
   \caption{Pearson correlation of each prior-date historical delay rate with the
@@ -344,7 +351,7 @@ remaining $20\%$ fit the calibrator (the \emph{calibration} window). No
 calibration-window label ever fits a base estimator. The resulting windows are
 summarised in Table~\ref{tab:windows}.
 
-\begin{table}[t]
+\begin{table}[!t]
   \caption{Chronological windows (2013).}
   \label{tab:windows}
   \centering
@@ -363,8 +370,7 @@ summarised in Table~\ref{tab:windows}.
 \subsection{Models}
 Two classifiers share the identical training rows and feature contract:
 \begin{itemize}
-  \item \textbf{Logistic Regression} with \code{class\_weight="balanced"} to
-  counter the class imbalance.
+  \item \textbf{Logistic Regression} with \code{class\_weight=} \code{"balanced"} to counter the class imbalance.
   \item \textbf{Tuned XGBoost} with parameters selected previously by
   training-only chronological cross-validation: $250$ trees, max depth $6$,
   learning rate $0.03$, minimum child weight $10$, subsample $0.90$, column
@@ -383,7 +389,7 @@ experiment, so it was not globally unseen during project development.
 
 \subsection{Calibration}
 Each model's calibration-window scores are mapped by three candidates---raw
-(identity), sigmoid (Platt)~\cite{platt}, and isotonic~\cite{zadrozny}---and the
+(identity), sigmoid (Platt), and isotonic---and the
 variant minimising validation Brier score (log loss as tie-break) is selected.
 Calibrators are fit strictly on the calibration window; validation and test
 labels never fit them.
@@ -419,7 +425,7 @@ roughly $60\%$ of true delays at the cost of a large false-alarm count
 weighting and is exactly what the cost analysis of Section~\ref{sec:resched}
 later prices.
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{confusion}
   \caption{Validation confusion matrices at the frozen operating thresholds.
@@ -428,7 +434,7 @@ later prices.
   \label{fig:confusion}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[!t]
   \caption{Validation metrics (isotonic calibration; frozen thresholds).}
   \label{tab:val}
   \centering
@@ -444,7 +450,7 @@ later prices.
   \end{tabular}}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{val-roc}
   \caption{Validation ROC curves. Discrimination is modest in absolute terms
@@ -452,7 +458,7 @@ later prices.
   \label{fig:roc}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{val-pr}
   \caption{Validation precision--recall curves against the prevalence
@@ -475,7 +481,7 @@ i.e.\ both models over-predict on this lower-prevalence window---another reason
 the calibrated probabilities are only modestly useful. The XGBoost reliability
 diagram (Fig.~\ref{fig:reliability}) is reasonable but not strong.
 
-\begin{table}[t]
+\begin{table}[!t]
   \caption{Validation calibration quality (observed prevalence $0.156$;
   prevalence-baseline Brier $0.138$). Lower Brier/log loss is better; a
   well-calibrated mean prediction would match the observed prevalence.}
@@ -494,7 +500,7 @@ diagram (Fig.~\ref{fig:reliability}) is reasonable but not strong.
   \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.9\columnwidth]{xgb-reliability}
   \caption{Validation reliability diagram for the calibrated XGBoost model
@@ -513,7 +519,7 @@ is descriptive rather than statistically established. The test period was also
 used for an earlier pre-congestion experiment and was later replayed to verify
 the audit; it was not untouched across the full development history.
 
-\begin{table}[t]
+\begin{table}[!t]
   \caption{Held-out test metrics for the frozen 31-feature model.}
   \label{tab:test}
   \centering
@@ -543,7 +549,7 @@ small differences do not establish that airport congestion is unimportant.
 Importance here is model-relative and does not imply causation; correlated
 calendar features can share or dilute one another's attributed gain.
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=0.95\columnwidth]{xgb-importance}
   \caption{Gain importance for the ten most influential encoded features in the
@@ -583,7 +589,7 @@ flights, the saving relative to the no-action status quo is
 \text{net} = \mathrm{tp}\,(r\,C_d - C_a) - \mathrm{fp}\,C_a,
 \label{eq:net}
 \end{equation}
-a cost-sensitive generalisation of decision-curve net benefit~\cite{vickers}.
+a cost-sensitive generalisation of decision-curve net benefit.
 Acting on a flight has non-negative expected value exactly when its calibrated
 probability $p$ satisfies $p\,r\,C_d \geq C_a$, giving the \emph{cost-optimal
 action threshold}
@@ -601,7 +607,7 @@ $r=0.8$ on the validation partition (preserving the held-out test), evaluating
 each model at its optimal $\tau^\star$ (Table~\ref{tab:sweep},
 Fig.~\ref{fig:netbenefit}).
 
-\begin{table}[t]
+\begin{table}[!t]
   \caption{Rescheduling sensitivity: net saving per flight (units of $C_d$) at
   the cost-optimal threshold, $r=0.8$. ``$+$'' beats no action.}
   \label{tab:sweep}
@@ -619,7 +625,7 @@ Fig.~\ref{fig:netbenefit}).
   \end{tabular}
 \end{table}
 
-\begin{figure}[t]
+\begin{figure}[!t]
   \centering
   \includegraphics[width=\columnwidth]{xgb-netbenefit}
   \caption{Validation XGBoost net saving per flight versus action threshold
@@ -693,42 +699,18 @@ reviewer can confirm that the reported numbers came from the committed data and
 code; the final test stage is additionally guarded so it cannot be silently
 re-run or re-selected.
 
+
+
+
+
+
 \begin{thebibliography}{00}
-\bibitem{bts} US Bureau of Transportation Statistics, ``Airline On-Time
-Performance Data,'' BTS, TranStats database. [Online]. Available:
-\url{https://www.transtats.bts.gov/}
-\bibitem{guo} C. Guo, G. Pleiss, Y. Sun, and K. Q. Weinberger, ``On calibration
-of modern neural networks,'' in \emph{Proc. 34th Int. Conf. Machine Learning
-(ICML)}, 2017, pp. 1321--1330.
-\bibitem{xgboost} T. Chen and C. Guestrin, ``XGBoost: A scalable tree boosting
-system,'' in \emph{Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data
-Mining}, 2016, pp. 785--794.
-\bibitem{platt} J. Platt, ``Probabilistic outputs for support vector machines and
-comparisons to regularized likelihood methods,'' in \emph{Advances in Large
-Margin Classifiers}, 1999, pp. 61--74.
-\bibitem{zadrozny} B. Zadrozny and C. Elkan, ``Transforming classifier scores
-into accurate multiclass probability estimates,'' in \emph{Proc. 8th ACM SIGKDD
-Int. Conf. Knowledge Discovery and Data Mining}, 2002, pp. 694--699.
-\bibitem{niculescu} A. Niculescu-Mizil and R. Caruana, ``Predicting good
-probabilities with supervised learning,'' in \emph{Proc. 22nd Int. Conf. Machine
-Learning (ICML)}, 2005, pp. 625--632.
-\bibitem{davis} J. Davis and M. Goadrich, ``The relationship between
-precision-recall and ROC curves,'' in \emph{Proc. 23rd Int. Conf. Machine
-Learning (ICML)}, 2006, pp. 233--240.
-\bibitem{saito} T. Saito and M. Rehmsmeier, ``The precision-recall plot is more
-informative than the ROC plot when evaluating binary classifiers on imbalanced
-datasets,'' \emph{PLoS ONE}, vol. 10, no. 3, e0118432, 2015.
-\bibitem{vickers} A. J. Vickers and E. B. Elkin, ``Decision curve analysis: a
-novel method for evaluating prediction models,'' \emph{Medical Decision Making},
-vol. 26, no. 6, pp. 565--574, 2006.
-\bibitem{sklearn} F. Pedregosa \emph{et al.}, ``Scikit-learn: Machine learning in
-Python,'' \emph{J. Machine Learning Research}, vol. 12, pp. 2825--2830, 2011.
-\bibitem{rebollo} J. J. Rebollo and H. Balakrishnan, ``Characterization and
-prediction of air traffic delays,'' \emph{Transportation Research Part C},
-vol. 44, pp. 231--241, 2014.
-\bibitem{gui} G. Gui \emph{et al.}, ``Flight delay prediction based on aviation
-big data and machine learning,'' \emph{IEEE Trans. Vehicular Technology},
-vol. 69, no. 1, pp. 140--150, 2020.
+\bibitem{aml-lecture-notes} Advanced Machine Learning lecture notes.
+\bibitem{aml-lab-notes} Advanced Machine Learning lab notes.
+\bibitem{chatgpt} OpenAI, ChatGPT. Available: \url{https://chatgpt.com/}.
+\bibitem{claude} Anthropic, Claude. Available: \url{https://claude.ai/}.
+\bibitem{bts} U.S. Bureau of Transportation Statistics, ``Airline On-Time Performance Data,'' TranStats database. [Online]. Available: \url{https://www.transtats.bts.gov/}.
+\bibitem{guo} C. Guo, G. Pleiss, Y. Sun, and K. Q. Weinberger, ``On Calibration of Modern Neural Networks,'' in \emph{Proceedings of the 34th International Conference on Machine Learning (ICML)}, 2017, pp. 1321--1330.
 \end{thebibliography}
 
 \end{document}
