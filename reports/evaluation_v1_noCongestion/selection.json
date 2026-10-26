@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "data_sha256": "8bdc6abbf07ac0cbb1036bc14a787cab3eea616be46c31899d2d8048963b08aa",
+  "seed": 42,
+  "versions": {
+    "numpy": "2.5.4",
+    "pandas": "3.0.6",
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.4.1"
+  },
+  "windows": {
+    "base_train": {
+      "n": 181405,
+      "first": "2013-01-01",
+      "last": "2013-07-23"
+    },
+    "train_calibration": {
+      "n": 46894,
+      "first": "2013-07-24",
+      "last": "2013-09-12"
+    },
+    "validation": {
+      "n": 50466,
+      "first": "2013-09-13",
+      "last": "2013-11-06"
+    }
+  },
+  "feature_columns": [
+    "month",
+    "day",
+    "sched_dep_time",
+    "sched_arr_time",
+    "hour",
+    "minute",
+    "carrier",
+    "origin",
+    "dest",
+    "distance",
+    "day_of_week",
+    "is_weekend",
+    "season",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "day_of_week_sin",
+    "day_of_week_cos",
+    "route",
+    "distance_band",
+    "is_long_haul",
+    "distance_log",
+    "carrier_historical_delay_rate",
+    "carrier_historical_flight_count",
+    "origin_historical_delay_rate",
+    "origin_historical_flight_count",
+    "destination_historical_delay_rate",
+    "destination_historical_flight_count",
+    "route_historical_delay_rate",
+    "route_historical_flight_count"
+  ],
+  "xgboost_parameters": {
+    "n_estimators": 250,
+    "max_depth": 6,
+    "learning_rate": 0.03,
+    "min_child_weight": 10,
+    "subsample": 0.9,
+    "colsample_bytree": 0.75,
+    "reg_lambda": 10.0,
+    "scale_pos_weight": 2.859
+  },
+  "calibration_rule": "minimum validation Brier, log loss tie-break",
+  "threshold_rule": "maximum validation F1; higher threshold tie-break",
+  "precision_constraints": "illustrative sensitivity only; no operational constraint approved",
+  "models": {
+    "logistic_balanced": {
+      "calibration": "isotonic",
+      "threshold": 0.34357316087308004,
+      "strategies": {
+        "max_f1": {
+          "threshold": 0.34357316087308004,
+          "precision": 0.22372738351926502,
+          "recall": 0.604713036868111,
+          "f1": 0.32661580045848015,
+          "f2": 0.45108305296185686,
+          "tp": 4773.0,
+          "fp": 16561.0,
+          "tn": 26012.0,
+          "fn": 3120.0,
+          "predicted_positive_rate": 0.422740062616415,
+          "false_alarm_rate": 0.3890024193737815,
+          "missed_delay_rate": 0.395286963131889
+        },
+        "max_f2": {
+          "threshold": 0.2525510204081633,
+          "precision": 0.17499025531085557,
+          "recall": 0.9100468769796022,
+          "f1": 0.2935371161194091,
+          "f2": 0.4945607270724318,
+          "tp": 7183.0,
+          "fp": 33865.0,
+          "tn": 8708.0,
+          "fn": 710.0,
+          "predicted_positive_rate": 0.813379304878532,
+          "false_alarm_rate": 0.7954572146665727,
+          "missed_delay_rate": 0.08995312302039782
+        },
+        "reference_0.5": {
+          "threshold": 0.5,
+          "precision": 0.42613636363636365,
+          "recall": 0.009502090459901177,
+          "f1": 0.018589664146734415,
+          "f2": 0.011811767670404434,
+          "tp": 75.0,
+          "fp": 101.0,
+          "tn": 42472.0,
+          "fn": 7818.0,
+          "predicted_positive_rate": 0.003487496532318789,
+          "false_alarm_rate": 0.0023723956498250065,
+          "missed_delay_rate": 0.9904979095400989
+        },
+        "precision_sensitivity": {
+          "0.2": {
+            "threshold": 0.31868131868131866,
+            "precision": 0.2017932489451477,
+            "recall": 0.7270999619916382,
+            "f1": 0.3159111551482124,
+            "f2": 0.47815436912617476,
+            "tp": 5739.0,
+            "fp": 22701.0,
+            "tn": 19872.0,
+            "fn": 2154.0,
+            "predicted_positive_rate": 0.5635477351087861,
+            "false_alarm_rate": 0.5332252836304701,
+            "missed_delay_rate": 0.2729000380083618
+          },
+          "0.25": {
+            "threshold": 0.35891767980074046,
+            "precision": 0.3810763888888889,
+            "recall": 0.05561890282528823,
+            "f1": 0.0970702045328911,
+            "f2": 0.06707615205965041,
+            "tp": 439.0,
+            "fp": 713.0,
+            "tn": 41860.0,
+            "fn": 7454.0,
+            "predicted_positive_rate": 0.02282725002972298,
+            "false_alarm_rate": 0.016747703943814155,
+            "missed_delay_rate": 0.9443810971747117
+          },
+          "0.3": {
+            "threshold": 0.35891767980074046,
+            "precision": 0.3810763888888889,
+            "recall": 0.05561890282528823,
+            "f1": 0.0970702045328911,
+            "f2": 0.06707615205965041,
+            "tp": 439.0,
+            "fp": 713.0,
+            "tn": 41860.0,
+            "fn": 7454.0,
+            "predicted_positive_rate": 0.02282725002972298,
+            "false_alarm_rate": 0.016747703943814155,
+            "missed_delay_rate": 0.9443810971747117
+          },
+          "0.4": {
+            "threshold": 0.3695645722931602,
+            "precision": 0.4083333333333333,
+            "recall": 0.012416064867604206,
+            "f1": 0.024099348333948112,
+            "f2": 0.015402992581415817,
+            "tp": 98.0,
+            "fp": 142.0,
+            "tn": 42431.0,
+            "fn": 7795.0,
+            "predicted_positive_rate": 0.004755677089525621,
+            "false_alarm_rate": 0.00333544734925892,
+            "missed_delay_rate": 0.9875839351323958
+          }
+        }
+      }
+    },
+    "xgboost_tuned_full": {
+      "calibration": "isotonic",
+      "threshold": 0.25,
+      "strategies": {
+        "max_f1": {
+          "threshold": 0.25,
+          "precision": 0.2161513613290263,
+          "recall": 0.5934372228556949,
+          "f1": 0.31688258972364103,
+          "f2": 0.439878291574321,
+          "tp": 4684.0,
+          "fp": 16986.0,
+          "tn": 25587.0,
+          "fn": 3209.0,
+          "predicted_positive_rate": 0.42939801054175086,
+          "false_alarm_rate": 0.3989852723557184,
+          "missed_delay_rate": 0.40656277714430505
+        },
+        "max_f2": {
+          "threshold": 0.1195650099730882,
+          "precision": 0.18042646254784034,
+          "recall": 0.8779931584948689,
+          "f1": 0.29933912142024105,
+          "f2": 0.4951343936211257,
+          "tp": 6930.0,
+          "fp": 31479.0,
+          "tn": 11094.0,
+          "fn": 963.0,
+          "predicted_positive_rate": 0.7610866722149566,
+          "false_alarm_rate": 0.739412303572687,
+          "missed_delay_rate": 0.12200684150513112
+        },
+        "reference_0.5": {
+          "threshold": 0.5,
+          "precision": 0.16666666666666666,
+          "recall": 0.0006334726973267452,
+          "f1": 0.0012621481761958854,
+          "f2": 0.0007910891715714195,
+          "tp": 5.0,
+          "fp": 25.0,
+          "tn": 42548.0,
+          "fn": 7888.0,
+          "predicted_positive_rate": 0.0005944596361907026,
+          "false_alarm_rate": 0.0005872266459962887,
+          "missed_delay_rate": 0.9993665273026733
+        },
+        "precision_sensitivity": {
+          "0.2": {
+            "threshold": 0.212913143735588,
+            "precision": 0.20032857941834453,
+            "recall": 0.7260864056759153,
+            "f1": 0.3140187940056437,
+            "f2": 0.4761548687271519,
+            "tp": 5731.0,
+            "fp": 22877.0,
+            "tn": 19696.0,
+            "fn": 2162.0,
+            "predicted_positive_rate": 0.566876709071454,
+            "false_alarm_rate": 0.5373593592182839,
+            "missed_delay_rate": 0.27391359432408463
+          },
+          "0.25": null,
+          "0.3": null,
+          "0.4": null
+        }
+      }
+    }
+  },
+  "winner": "logistic_balanced",
+  "artifact_sha256": "fcacf7ae9a12e21297de0ba040bd8177fb49125cf44e2de2d98499603c6de217"
+}

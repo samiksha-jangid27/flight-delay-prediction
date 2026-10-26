@@ -74,6 +74,11 @@ columns:
 - **Origin**: EWR **27.9%** > JFK **25.5%** > LGA **24.0%** — only 3 NYC airports, so
   limited variety (flag for the DL embedding phase).
 - **Historical delay-rate features** correlate positively with the target (see EDA §9).
+- **Airport congestion** (`origin_hourly_departures`, `dest_hourly_arrivals`, schedule-derived)
+  represents time-specific scheduled load. On this single-hub/one-year dataset it adds little
+  (weak, slightly negative correlation; low model importance) because the scheduled `hour`
+  already captures most time-of-day congestion — but it satisfies the brief's congestion
+  requirement and should matter more on a larger multi-airport dataset.
 
 ---
 

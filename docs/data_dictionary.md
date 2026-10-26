@@ -56,6 +56,12 @@ Availability key:
 | `route_historical_delay_rate` | float | Route delay rate over prior dates. |
 | `route_historical_flight_count` | int | Route flights on prior dates. |
 
+### Airport congestion features (`features/congestion.py`)
+| Column | Type | Description |
+|---|---|---|
+| `origin_hourly_departures` | int32 | Flights scheduled to depart the same origin in the same (date, hour). Schedule-derived; known pre-departure. |
+| `dest_hourly_arrivals` | int32 | Flights scheduled to arrive at the same destination in the same (date, scheduled-arrival hour). Schedule-derived; known pre-departure. |
+
 ### Temporal features (`features/temporal.py` — Rashmi)
 | Column | Type | Description |
 |---|---|---|

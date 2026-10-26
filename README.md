@@ -115,8 +115,8 @@ split — partitioned by unique calendar date, not by row — is in
 ## Feature Engineering
 
 All features are derived strictly from the schedule and from historical
-outcomes on prior calendar dates. Three independent engines contribute
-features, each documented and unit-tested.
+outcomes on prior calendar dates (**33 model features** in total). Four
+independent engines contribute features, each documented and unit-tested.
 
 ### Temporal features &nbsp;·&nbsp; [`temporal.py`](src/flight_delay/features/temporal.py)
 
@@ -156,6 +156,20 @@ aggregation.
 | Origin | `origin_historical_delay_rate`, `origin_historical_flight_count` |
 | Destination | `destination_historical_delay_rate`, `destination_historical_flight_count` |
 | Route | `route_historical_delay_rate`, `route_historical_flight_count` |
+
+### Airport congestion features &nbsp;·&nbsp; [`congestion.py`](src/flight_delay/features/congestion.py)
+
+Schedule-derived airport load (known before departure, so no leakage):
+
+| Feature | Description |
+|---------|-------------|
+| `origin_hourly_departures` | Flights scheduled to depart the same origin in the same (date, hour) |
+| `dest_hourly_arrivals` | Flights scheduled to arrive at the same destination in the same (date, arrival hour) |
+
+These represent "airport congestion" directly (time-specific scheduled load). On
+this single-hub, one-year dataset their marginal value is small — the scheduled
+hour already captures most time-of-day congestion — but they satisfy the brief's
+congestion requirement and would matter more on a larger multi-airport dataset.
 
 ### Feature selection &nbsp;·&nbsp; [`selection.py`](src/flight_delay/features/selection.py)
 
@@ -231,15 +245,15 @@ proper-score audit are in [evaluation_results.md](docs/evaluation_results.md) an
 
 | Model | Threshold | PR-AUC | ROC-AUC | Precision | Recall | F1 | Brier |
 |-------|----------:|-------:|--------:|----------:|-------:|---:|------:|
-| Balanced Logistic Regression | 0.344 | 0.223 | 0.636 | 0.224 | 0.605 | 0.327 | 0.151 |
-| Tuned XGBoost | 0.250 | 0.213 | 0.628 | 0.216 | 0.593 | 0.317 | 0.137 |
+| Balanced Logistic Regression | 0.345 | 0.230 | 0.638 | 0.229 | 0.576 | 0.327 | 0.152 |
+| Tuned XGBoost | 0.257 | 0.212 | 0.626 | 0.216 | 0.596 | 0.317 | 0.137 |
 
 **Held-out test (one-time frozen evaluation, 48,581 flights, prevalence 0.269)**
 
 | Model | PR-AUC | ROC-AUC | Precision | Recall | F1 |
 |-------|-------:|--------:|----------:|-------:|---:|
-| Balanced Logistic Regression | 0.294 | 0.544 | 0.296 | 0.488 | 0.369 |
-| Tuned XGBoost | 0.337 | 0.599 | 0.335 | 0.532 | 0.411 |
+| Balanced Logistic Regression | 0.296 | 0.545 | 0.300 | 0.465 | 0.364 |
+| Tuned XGBoost | 0.338 | 0.599 | 0.332 | 0.542 | 0.412 |
 
 XGBoost is the stronger descriptive held-out candidate on PR-AUC, ROC-AUC,
 precision, recall and F1. Discrimination is modest in absolute terms (ROC-AUC
@@ -280,15 +294,17 @@ partition so the held-out test is preserved:
 | 0.05 | 0.063 | ✓ (+0.075/flt) | ✓ (+0.075/flt) |
 | 0.10 | 0.125 | ✓ (+0.025/flt) | ✓ (+0.034/flt) |
 | 0.15 | 0.188 | ✗ (−0.016/flt) | ✓ (+0.005/flt) |
-| 0.25 | 0.313 | ✗ (−0.056/flt) | ✗ (−0.018/flt) |
+| 0.25 | 0.313 | ✗ (−0.049/flt) | ✗ (−0.020/flt) |
 
 **Findings.** A model-driven rescheduling rule pays off only when interventions
 are cheap relative to a delay — up to `C_a/C_d ≈ 0.10` for Logistic Regression
 and `≈ 0.15` for XGBoost. Under moderate costs, neither model beats doing nothing,
-because low precision makes false-alarm costs dominate. **XGBoost dominates
-Logistic Regression across the whole sweep** (wider positive-savings region,
-higher oracle efficiency), a decision-relevant reason to prefer it that the
-ranking metrics alone did not surface.
+because low precision makes false-alarm costs dominate. **XGBoost has the more
+favourable cost-sensitivity profile across the meaningful range** (wider
+contiguous positive-savings region, higher oracle efficiency), with one isolated
+degenerate exception at the highest cost ratios where both models act on almost
+nothing — a decision-relevant reason to prefer XGBoost that the ranking metrics
+alone did not surface.
 
 ---
 
@@ -315,7 +331,7 @@ flight-delay-prediction/
 │   ├── models/         logistic, xgboost_model
 │   └── evaluation/     metrics, calibration, thresholds, predictions, evaluate,
 │                       rescheduling, baselines, run_state, plots
-└── tests/              Automated test suite (218 tests)
+└── tests/              Automated test suite (223 tests)
 ```
 
 ---
@@ -351,6 +367,13 @@ settings — is centralized in [`configs/config.yaml`](configs/config.yaml).
 The complete Advanced ML phase runs end to end from the raw dataset. Run from the
 repository root with the package installed.
 
+> **Reproducibility note.** CI runs only the synthetic tests (it never reads the
+> real dataset or the held-out test partition). The data-dependent steps below were
+> verified to run on the real `data/raw/flights.csv`: `scripts/compare_models.py`
+> reproduces the documented balanced-LR validation AP of `0.206047` exactly. To
+> check changes, re-run steps 1–3; **do not** re-run the guarded final-test stage
+> just to verify edits — it is intended to run once.
+
 ```bash
 # 1. Model-to-model comparison on the chronological validation split
 python scripts/compare_models.py --n-jobs 4
@@ -363,6 +386,10 @@ python -m flight_delay.evaluation.evaluate validation \
 # 3. Offline rescheduling what-if over the selected calibrated predictions
 python scripts/rescheduling_analysis.py --eval-dir reports/evaluation \
   --cost-ratio 0.25 --recovery 0.8
+
+# 3b. Concrete sample prediction (demo): raw score -> isotonic calibration ->
+#     frozen threshold -> decision, for real validation flights
+python scripts/predict_example.py
 
 # 4. One-time held-out test — only after reviewing reports/evaluation/selection.json
 python -m flight_delay.evaluation.evaluate final-test \
@@ -457,9 +484,20 @@ versions and remaining limitations.
 
 ## Dataset
 
-The project uses the recommended Kaggle US flight dataset as the starter
-dataset. Acquisition instructions are documented separately; the raw file is
-expected at `data/raw/flights.csv`.
+The project uses the recommended Kaggle US flight dataset as the starter dataset:
+**[Flights — Kaggle (2013 US flights)](https://www.kaggle.com/datasets/matinsajadi/flights)**
+(the 2013 NYC-origin `nycflights13` records). Download `flights.csv` and place it
+at `data/raw/flights.csv`.
+
+**Dataset at a glance:** 336,776 raw rows × 21 columns → **327,346 usable** after
+dropping 9,430 rows with an undefined arrival outcome (0 duplicates); 16 carriers,
+3 origin airports (EWR/JFK/LGA), 105 destinations, 224 routes, year 2013.
+
+**Delay prevalence shifts across the chronological partitions** (a real seasonal
+effect, not a bug): train **25.9%**, validation **15.6%**, test **26.9%**. Because
+precision–recall metrics depend on prevalence, cross-partition comparisons are not
+read as improvements. See the partition/monthly figure in the report
+(`paper/figures/prevalence-shift.png`).
 
 ## Evaluation and supplementary audits
 

@@ -23,10 +23,15 @@ HISTORICAL_FEATURES: tuple[str, ...] = (
     "destination_historical_delay_rate", "destination_historical_flight_count",
     "route_historical_delay_rate", "route_historical_flight_count",
 )
+CONGESTION_FEATURES: tuple[str, ...] = (
+    "origin_hourly_departures", "dest_hourly_arrivals",
+)
 FEATURE_SETS: dict[str, tuple[str, ...]] = {
     "schedule": SCHEDULE_FEATURES,
     "route": SCHEDULE_FEATURES + ROUTE_FEATURES,
-    "full": SCHEDULE_FEATURES + ROUTE_FEATURES + HISTORICAL_FEATURES,
+    "full": (
+        SCHEDULE_FEATURES + ROUTE_FEATURES + HISTORICAL_FEATURES + CONGESTION_FEATURES
+    ),
 }
 CATEGORICAL_FEATURES: frozenset[str] = frozenset(
     {"carrier", "origin", "dest", "route", "distance_band"}

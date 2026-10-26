@@ -1,0 +1,132 @@
+{
+  "assumptions": {
+    "cost_delay": 1.0,
+    "cost_action": 0.25,
+    "cost_ratio": 0.25,
+    "recovery": 0.8,
+    "optimal_threshold": 0.3125,
+    "units": "all costs expressed relative to cost_delay",
+    "model": "per-flight homogeneous costs; flights independent; offline retrospective replay with no feedback effects; no operational cost has been approved"
+  },
+  "partition": "validation",
+  "models": {
+    "logistic_balanced": {
+      "population": {
+        "n": 50466,
+        "n_delayed": 7893,
+        "prevalence": 0.15640233028177386
+      },
+      "baselines_per_flight": {
+        "no_action": 0.15640233028177386,
+        "reschedule_all": 0.28128046605635476,
+        "oracle": 0.07038104862679823
+      },
+      "policy_at_optimal_threshold": {
+        "threshold": 0.3125,
+        "acted": 30680,
+        "tp": 6027,
+        "fp": 24653,
+        "fn": 1866,
+        "tn": 17920,
+        "n": 50466,
+        "n_delayed": 7893,
+        "predicted_positive_rate": 0.6079340546110252,
+        "precision": 0.19644719687092568,
+        "recall": 0.7635879893576587,
+        "policy_cost": 10741.4,
+        "no_action_cost": 7893.0,
+        "reschedule_all_cost": 14195.1,
+        "net_savings": -2848.3999999999996,
+        "net_savings_per_flight": -0.056441960924186574,
+        "savings_fraction_of_status_quo": -0.3608767262131002,
+        "oracle_savings": 4341.150000000001,
+        "oracle_efficiency": -0.6561395022056365,
+        "beats_no_action": false,
+        "beats_reschedule_all": true
+      },
+      "policy_at_frozen_threshold": {
+        "note": "validation-selected classification threshold; not cost-derived",
+        "threshold": 0.34357316087308004,
+        "acted": 21334,
+        "tp": 4773,
+        "fp": 16561,
+        "fn": 3120,
+        "tn": 26012,
+        "n": 50466,
+        "n_delayed": 7893,
+        "predicted_positive_rate": 0.422740062616415,
+        "precision": 0.22372738351926502,
+        "recall": 0.604713036868111,
+        "policy_cost": 9408.1,
+        "no_action_cost": 7893.0,
+        "reschedule_all_cost": 14195.1,
+        "net_savings": -1515.1000000000004,
+        "net_savings_per_flight": -0.030022193159751128,
+        "savings_fraction_of_status_quo": -0.1919548967439504,
+        "oracle_savings": 4341.150000000001,
+        "oracle_efficiency": -0.34900890317081884,
+        "beats_no_action": false,
+        "beats_reschedule_all": true
+      }
+    },
+    "xgboost_tuned_full": {
+      "population": {
+        "n": 50466,
+        "n_delayed": 7893,
+        "prevalence": 0.15640233028177386
+      },
+      "baselines_per_flight": {
+        "no_action": 0.15640233028177386,
+        "reschedule_all": 0.28128046605635476,
+        "oracle": 0.07038104862679823
+      },
+      "policy_at_optimal_threshold": {
+        "threshold": 0.3125,
+        "acted": 13920,
+        "tp": 3243,
+        "fp": 10677,
+        "fn": 4650,
+        "tn": 31896,
+        "n": 50466,
+        "n_delayed": 7893,
+        "predicted_positive_rate": 0.275829271192486,
+        "precision": 0.23297413793103447,
+        "recall": 0.410870391486127,
+        "policy_cost": 8778.6,
+        "no_action_cost": 7893.0,
+        "reschedule_all_cost": 14195.1,
+        "net_savings": -885.6000000000004,
+        "net_savings_per_flight": -0.017548448460349548,
+        "savings_fraction_of_status_quo": -0.11220068415051315,
+        "oracle_savings": 4341.150000000001,
+        "oracle_efficiency": -0.2040012439100239,
+        "beats_no_action": false,
+        "beats_reschedule_all": true
+      },
+      "policy_at_frozen_threshold": {
+        "note": "validation-selected classification threshold; not cost-derived",
+        "threshold": 0.25,
+        "acted": 21670,
+        "tp": 4684,
+        "fp": 16986,
+        "fn": 3209,
+        "tn": 25587,
+        "n": 50466,
+        "n_delayed": 7893,
+        "predicted_positive_rate": 0.42939801054175086,
+        "precision": 0.2161513613290263,
+        "recall": 0.5934372228556949,
+        "policy_cost": 9563.3,
+        "no_action_cost": 7893.0,
+        "reschedule_all_cost": 14195.1,
+        "net_savings": -1670.2999999999993,
+        "net_savings_per_flight": -0.03309753101097768,
+        "savings_fraction_of_status_quo": -0.2116178892689724,
+        "oracle_savings": 4341.150000000001,
+        "oracle_efficiency": -0.3847597986708589,
+        "beats_no_action": false,
+        "beats_reschedule_all": true
+      }
+    }
+  }
+}

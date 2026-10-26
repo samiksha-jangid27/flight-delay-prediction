@@ -43,9 +43,15 @@ chronological validation flights (delay prevalence: 15.6402%).
 XGBoost achieved approximately 16.1% higher Average Precision
 than balanced Logistic Regression.
 
-The earlier Logistic Regression notebook reported slightly different
-balanced-model scores. This discrepancy remains to be explained;
-the table above records the direct comparison from this run.
+**Discrepancy resolved.** The earlier Logistic Regression notebook reported a
+balanced-model AP of `0.206450`, whereas the direct comparison here reports
+`0.206047`. The difference is not a modelling error: the notebook predates the
+shared-pipeline refactor, in which Logistic Regression previously built the data
+twice and read an unused raw CSV, slightly perturbing the fitted pipeline. The
+**canonical value is `0.206047`**, produced by `scripts/compare_models.py` on the
+current `main` branch, which builds the dataset once and fits all candidates on
+identical rows. This number reproduces exactly on re-run (verified), so the
+notebook figure should be treated as the superseded pre-refactor value.
 
 These are model-comparison results on validation data, not final
 held-out test results.

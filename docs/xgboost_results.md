@@ -99,7 +99,7 @@ Importance is **model-relative** and does not establish causal effects. Correlat
 
 ## Verification and reproducibility
 
-The initial repository suite passed **33 tests**, and after adding the XGBoost component the combined suite passed **42 tests**, including **9 XGBoost-specific tests**. The final selected fitted pipeline was saved, reloaded, and verified to reproduce every saved validation probability (within floating-point tolerance), matching all **50,466 flight IDs** and labels. This verification was performed on the developer's Mac with Python 3.12.15 and XGBoost 3.4.1.
+The initial repository suite passed **33 tests**, and after adding the XGBoost component the combined suite passed **42 tests**, including **9 XGBoost-specific tests**. *(These are historical snapshots from the XGBoost-integration phase; the full project suite now stands at **223 tests** — see the main README.)* The final selected fitted pipeline was saved, reloaded, and verified to reproduce every saved validation probability (within floating-point tolerance), matching all **50,466 flight IDs** and labels. This verification was performed on the developer's Mac with Python 3.12.15 and XGBoost 3.4.1.
 
 Commands (run from repository root in the prepared environment):
 

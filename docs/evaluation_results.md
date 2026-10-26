@@ -1,5 +1,14 @@
 # Flight Delay Prediction — Evaluation & Calibration
 
+> **⚠️ Superseded run.** This document records the original frozen evaluation of
+> 22 October 2026, **before** the schedule-based airport-congestion features
+> (`origin_hourly_departures`, `dest_hourly_arrivals`) were added. The **current
+> canonical results** (33-feature model, congestion included) are in
+> [`paper/main.pdf`](../paper/main.pdf) and the [README](../README.md). The
+> numbers differ only marginally (e.g. XGBoost held-out test PR-AUC 0.337 → 0.338,
+> F1 0.411 → 0.412); the conclusions are unchanged. Numbers below are kept as the
+> dated experiment log for the original feature set.
+
 Executed 22 October 2026. Contribution: Lakshya, Model Evaluation & Calibration.
 
 ## Executive summary

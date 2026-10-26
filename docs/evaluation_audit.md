@@ -1,5 +1,12 @@
 # Evaluation audit — AML Phase 1
 
+> **⚠️ Superseded run.** This audit records the original frozen evaluation of
+> 22 October 2026, **before** the airport-congestion features were added. The
+> **current canonical results** (33-feature model) are in
+> [`paper/main.pdf`](../paper/main.pdf) and the [README](../README.md); they
+> differ only marginally (e.g. test PR-AUC 0.337 → 0.338) and the conclusions
+> hold. Numbers below are the dated log for the original feature set.
+
 Executed 22 October 2026 on `fix/lakshya-evaluation-audit`, based on reviewed merge
 `5be554cefb335de8030cc12c09bbb343eea7a527`. The branch adds verification and
 supplementary analysis. Original classifier implementations, hyperparameters,

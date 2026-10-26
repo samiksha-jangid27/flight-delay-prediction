@@ -6,6 +6,7 @@ import pandas as pd
 
 from flight_delay.data.load import load_flights
 from flight_delay.data.split import chronological_split
+from flight_delay.features.congestion import add_congestion_features
 from flight_delay.features.historical import add_historical_delay_features
 from flight_delay.features.route import add_route_features
 from flight_delay.features.target import create_delay_target
@@ -24,8 +25,9 @@ def build_data_pipeline(
     2. Create the binary delay target.
     3. Add temporal features.
     4. Add route features.
-    5. Add historical features using only previous dates.
-    6. Split chronologically into train, validation, and test.
+    5. Add schedule-based airport-congestion features.
+    6. Add historical features using only previous dates.
+    7. Split chronologically into train, validation, and test.
     """
 
     df = load_flights(path)
@@ -37,6 +39,7 @@ def build_data_pipeline(
 
     df = add_temporal_features(df)
     df = add_route_features(df)
+    df = add_congestion_features(df)
     df = add_historical_delay_features(df)
 
     train, validation, test = chronological_split(df)

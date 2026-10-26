@@ -66,6 +66,8 @@ def training_sample():
         "destination_historical_flight_count": rng.integers(0, 100, size=count),
         "route_historical_delay_rate": rng.random(count),
         "route_historical_flight_count": rng.integers(0, 100, size=count),
+        "origin_hourly_departures": rng.integers(1, 40, size=count),
+        "dest_hourly_arrivals": rng.integers(1, 10, size=count),
         "dep_delay": delayed * 1_000,  # obvious target leak: must never appear.
         "arr_delay": delayed * 999,
         "is_delayed": delayed,

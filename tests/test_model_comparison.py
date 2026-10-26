@@ -49,6 +49,8 @@ def synthetic_flights():
     for entity in ('carrier','origin','destination','route'):
         frame[f'{entity}_historical_delay_rate']=rng.random(n)
         frame[f'{entity}_historical_flight_count']=rng.integers(0,100,n)
+    frame['origin_hourly_departures']=rng.integers(1,40,n)
+    frame['dest_hourly_arrivals']=rng.integers(1,10,n)
     frame['is_delayed']=(np.arange(n)%5<2).astype(int)
     frame['arr_delay']=frame['is_delayed']*33
     frame['dep_delay']=frame['is_delayed']*35
@@ -58,7 +60,7 @@ def synthetic_flights():
 
 def test_approved_features_match_legacy_selector(synthetic_flights):
     train,_ = synthetic_flights
-    assert len(FEATURE_SETS['full']) == 31
+    assert len(FEATURE_SETS['full']) == 33
     pd.testing.assert_frame_equal(
         select_model_features(train),select_xgboost_features(train)
     )

@@ -1,0 +1,21 @@
+{
+  "method": "paired calendar-date block percentile; exchangeable dates; not serial block bootstrap",
+  "seed": 42,
+  "requested": 100,
+  "valid": 100,
+  "confidence": 0.95,
+  "differences": {
+    "average_precision": [
+      -0.02342373221335402,
+      0.009704874327779691
+    ],
+    "roc_auc": [
+      -0.024223021849991835,
+      0.010202930368378518
+    ],
+    "f1": [
+      -0.019715471556842182,
+      0.00630190293035318
+    ]
+  }
+}
