@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "canonical_model": "frozen_31_feature_pipeline",
+  "dataset": {
+    "name": "2013 NYC-origin flights",
+    "sha256": "8bdc6abbf07ac0cbb1036bc14a787cab3eea616be46c31899d2d8048963b08aa",
+    "raw_rows": 336776,
+    "labeled_rows": 327346,
+    "target": "arr_delay >= 15 minutes",
+    "target_positive_class": "is_delayed = 1"
+  },
+  "provenance": {
+    "seed": 42,
+    "software_versions": {
+      "numpy": "2.5.4",
+      "pandas": "3.0.6",
+      "scikit_learn": "1.9.1",
+      "xgboost": "3.4.1"
+    },
+    "test_metrics_source": "docs/evaluation_results.md; reproduced during the audit but not saved as reports/evaluation/test_metrics.json",
+    "uncertainty_provenance": "The canonical 300-resample intervals were recomputed from aligned saved validation predictions. The preserved reports/evaluation_v1_noCongestion/validation_bootstrap.json and ignored reports/evaluation/validation_bootstrap.json are 100-resample snapshots; their interval endpoints differ due to finite resampling, but the qualitative conclusion (intervals include zero) is unchanged.",
+    "test_period_reuse": "The same calendar test period was used in an earlier pre-congestion experiment and reproduced during audit. It was not used to select models or thresholds for this frozen run; it was not untouched throughout project history."
+  },
+  "features": {
+    "canonical_count": 31,
+    "congestion_ablation_count": 33,
+    "congestion_ablation_partition": "validation_only",
+    "canonical_columns": [
+      "month",
+      "day",
+      "sched_dep_time",
+      "sched_arr_time",
+      "hour",
+      "minute",
+      "carrier",
+      "origin",
+      "dest",
+      "distance",
+      "day_of_week",
+      "is_weekend",
+      "season",
+      "hour_sin",
+      "hour_cos",
+      "month_sin",
+      "month_cos",
+      "day_of_week_sin",
+      "day_of_week_cos",
+      "route",
+      "distance_band",
+      "is_long_haul",
+      "distance_log",
+      "carrier_historical_delay_rate",
+      "carrier_historical_flight_count",
+      "origin_historical_delay_rate",
+      "origin_historical_flight_count",
+      "destination_historical_delay_rate",
+      "destination_historical_flight_count",
+      "route_historical_delay_rate",
+      "route_historical_flight_count"
+    ],
+    "congestion_columns": [
+      "origin_hourly_departures",
+      "dest_hourly_arrivals"
+    ]
+  },
+  "windows": {
+    "base_train": {
+      "rows": 181405,
+      "first_date": "2013-01-01",
+      "last_date": "2013-07-23"
+    },
+    "train_calibration": {
+      "rows": 46894,
+      "first_date": "2013-07-24",
+      "last_date": "2013-09-12"
+    },
+    "validation": {
+      "rows": 50466,
+      "first_date": "2013-09-13",
+      "last_date": "2013-11-06",
+      "prevalence": 0.15640233028177386
+    },
+    "test": {
+      "rows": 48581,
+      "first_date": "2013-11-07",
+      "last_date": "2013-12-31",
+      "prevalence": 0.268562
+    }
+  },
+  "selection": {
+    "calibration_rule": "minimum validation Brier, log-loss tie-break",
+    "threshold_rule": "maximum validation F1; higher threshold tie-break",
+    "uncertainty": {
+      "method": "paired calendar-date block percentile bootstrap; assumes exchangeable dates",
+      "seed": 42,
+      "requested_resamples": 300,
+      "valid_resamples": 300,
+      "confidence": 0.95,
+      "source": "Recomputed with the repository paired_bootstrap implementation from the saved, ID-aligned validation prediction CSVs; no test data was read.",
+      "xgboost_minus_logistic_intervals": {
+        "average_precision": [-0.026506574858046878, 0.010649818051998723],
+        "roc_auc": [-0.02517415237974428, 0.010877692788638597],
+        "f1": [-0.02228018322792042, 0.009168329273295035]
+      }
+    },
+    "models": {
+      "logistic_balanced": {
+        "parameters": {
+          "C": 1.0,
+          "class_weight": "balanced",
+          "max_iter": 1000,
+          "solver": "lbfgs"
+        },
+        "calibration": "isotonic",
+        "threshold": 0.34357316087308004,
+        "validation": {
+          "average_precision": 0.22328480432854303,
+          "roc_auc": 0.6359764924714507,
+          "precision": 0.22372738351926502,
+          "recall": 0.604713036868111,
+          "f1": 0.32661580045848015,
+          "brier": 0.15089930541458618,
+          "log_loss": 0.4821967032726052,
+          "confusion_matrix": {
+            "tn": 26012,
+            "fp": 16561,
+            "fn": 3120,
+            "tp": 4773
+          }
+        },
+        "test": {
+          "average_precision": 0.294262,
+          "roc_auc": 0.543888,
+          "precision": 0.296195,
+          "recall": 0.488005,
+          "f1": 0.368642,
+          "brier": 0.198391,
+          "log_loss": 0.586488,
+          "confusion_matrix": {
+            "tn": 20405,
+            "fp": 15129,
+            "fn": 6680,
+            "tp": 6367
+          }
+        }
+      },
+      "xgboost_tuned_full": {
+        "parameters": {
+          "n_estimators": 250,
+          "max_depth": 6,
+          "learning_rate": 0.03,
+          "min_child_weight": 10,
+          "subsample": 0.9,
+          "colsample_bytree": 0.75,
+          "reg_lambda": 10.0,
+          "scale_pos_weight": 2.859
+        },
+        "calibration": "isotonic",
+        "threshold": 0.25,
+        "validation": {
+          "average_precision": 0.2128711584609638,
+          "roc_auc": 0.6279266693803041,
+          "precision": 0.2161513613290263,
+          "recall": 0.5934372228556949,
+          "f1": 0.31688258972364103,
+          "brier": 0.1371990033119259,
+          "log_loss": 0.442804442112657,
+          "confusion_matrix": {
+            "tn": 25587,
+            "fp": 16986,
+            "fn": 3209,
+            "tp": 4684
+          }
+        },
+        "test": {
+          "average_precision": 0.337091,
+          "roc_auc": 0.598862,
+          "precision": 0.334651,
+          "recall": 0.531923,
+          "f1": 0.410833,
+          "brier": 0.195484,
+          "log_loss": 0.58688,
+          "confusion_matrix": {
+            "tn": 21736,
+            "fp": 13798,
+            "fn": 6107,
+            "tp": 6940
+          }
+        }
+      }
+    }
+  },
+  "interpretation": {
+    "metric_name": "Average Precision (AP), not trapezoidal PR-AUC",
+    "historical_features_caveat": "Prior-calendar-date ordering is enforced; availability of every prior-date outcome at the prediction instant is unverified.",
+    "test_selection_caveat": "Test metrics do not alter the frozen model or thresholds."
+  }
+}

@@ -153,7 +153,7 @@ def run_experiment(
     model_dir.mkdir(parents=True, exist_ok=True)
 
     # Single pipeline execution retains matching identifiers, labels and features.
-    train, validation, _test_untouched = build_data_pipeline(data_path)
+    train, validation, _test_split = build_data_pipeline(data_path)
     X_train, y_train = split_features_and_target(train)
     X_validation, y_validation = split_features_and_target(validation)
     validation_dates = pd.to_datetime(
@@ -261,4 +261,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

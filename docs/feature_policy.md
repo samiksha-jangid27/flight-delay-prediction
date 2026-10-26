@@ -19,6 +19,15 @@ The model may use information known before departure, including:
 - Historical origin and destination statistics
 - Historical carrier statistics
 - Historical route statistics
+- Schedule-based origin departures and destination arrivals, computed from
+  the complete timetable before target filtering (validation-ablation variant
+  only; not part of the frozen 31-feature model)
+
+The congestion values are scheduled-load proxies over this NYC-origin dataset,
+not total airport traffic. Destination arrivals are grouped by departure date
+and scheduled arrival hour; an arrival crossing midnight is not assigned to
+the next calendar date. See `data_contract.md` for the feature definitions and
+limitations.
 
 ## Forbidden Information
 
@@ -54,3 +63,7 @@ If evaluation requires a static holdout, compute the aggregates from training
 data only and freeze them for all validation/test dates instead.
 
 Never allow same-day or future-date outcomes to influence a flight's features.
+
+Prior-date labels are used under the documented rolling daily protocol, but
+their availability at the exact operational prediction timestamp has not been
+verified. Do not describe the feature set as proven deployable on that basis.

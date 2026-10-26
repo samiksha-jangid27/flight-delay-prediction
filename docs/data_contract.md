@@ -32,24 +32,33 @@ for those observations.
 These rows remain part of the raw dataset and should be documented
 rather than silently deleted.
 
-## 5. Allowed Candidate Features
+## 5. Candidate Features
 
-- month
-- day
-- sched_dep_time
-- sched_arr_time
-- carrier
-- flight
-- tailnum
-- origin
-- dest
-- distance
-- hour
-- minute
-- time_hour
+The raw schedule provides candidate fields such as month, day, scheduled
+departure/arrival times, carrier, origin, destination, distance, hour and
+minute. `flight`, `tailnum` and `time_hour` are not admitted by the model
+allowlist. Engineered calendar and route fields are described in the data
+dictionary.
 
-Some high-cardinality features may be excluded from the first baseline
-and evaluated separately.
+The canonical frozen evaluation uses the 31-feature `full` allowlist. The
+two congestion features below are an additional 33-feature variant used only
+for a validation ablation; no test score is reported for that variant.
+
+### Schedule-derived congestion proxies
+
+- `origin_hourly_departures` counts flights scheduled to depart the same origin
+  in the same departure-date and scheduled-departure-hour bucket.
+- `dest_hourly_arrivals` counts flights in this NYC-origin dataset scheduled
+  to arrive at the same destination in the same scheduled-arrival-hour bucket,
+  grouped by departure date.
+
+Both features are computed over the complete raw timetable before flights with
+undefined `arr_delay` are removed. Thus a cancelled/diverted flight still
+contributes its scheduled slot. The destination feature is only a partial
+schedule-based load proxy, not a count of all airport arrivals. Flights
+scheduled across midnight remain grouped under their departure date; the
+arrival date is not reconstructed. These assumptions are a limitation, not a
+claim that realized airport congestion is known.
 
 ## 6. Excluded Features
 
@@ -113,13 +122,12 @@ Random train/test splitting will not be used for the main experiment.
 
 ## 9. Evaluation
 
-The main evaluation will include:
+The frozen evaluation reports scikit-learn Average Precision (AP), ROC-AUC,
+precision, recall, F1 and calibration:
 
-- PR-AUC
-- ROC-AUC
-- Precision
-- Recall
-- Calibration
+AP is recall-increment-weighted precision and is not identical to trapezoidal
+area under a precision-recall curve. Use “Average Precision (AP)” when
+referring to the stored metric.
 
 The operational probability threshold will be selected separately from
 the target-definition threshold.

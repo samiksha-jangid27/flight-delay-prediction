@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "experiment": "validation-only congestion ablation",
+  "test_used": false,
+  "data_sha256": "8bdc6abbf07ac0cbb1036bc14a787cab3eea616be46c31899d2d8048963b08aa",
+  "seed": 42,
+  "versions": {
+    "python": "3.14.7",
+    "numpy": "2.5.4",
+    "pandas": "3.0.6",
+    "scikit_learn": "1.9.1",
+    "xgboost": "3.4.1"
+  },
+  "windows": {
+    "outer_training": {
+      "n": 228299
+    },
+    "base_training": {
+      "n": 181405,
+      "first": "2013-01-01",
+      "last": "2013-07-23"
+    },
+    "validation": {
+      "n": 50466,
+      "first": "2013-09-13",
+      "last": "2013-11-06"
+    }
+  },
+  "feature_columns": {
+    "full": [
+      "month",
+      "day",
+      "sched_dep_time",
+      "sched_arr_time",
+      "hour",
+      "minute",
+      "carrier",
+      "origin",
+      "dest",
+      "distance",
+      "day_of_week",
+      "is_weekend",
+      "season",
+      "hour_sin",
+      "hour_cos",
+      "month_sin",
+      "month_cos",
+      "day_of_week_sin",
+      "day_of_week_cos",
+      "route",
+      "distance_band",
+      "is_long_haul",
+      "distance_log",
+      "carrier_historical_delay_rate",
+      "carrier_historical_flight_count",
+      "origin_historical_delay_rate",
+      "origin_historical_flight_count",
+      "destination_historical_delay_rate",
+      "destination_historical_flight_count",
+      "route_historical_delay_rate",
+      "route_historical_flight_count"
+    ],
+    "full_congestion": [
+      "month",
+      "day",
+      "sched_dep_time",
+      "sched_arr_time",
+      "hour",
+      "minute",
+      "carrier",
+      "origin",
+      "dest",
+      "distance",
+      "day_of_week",
+      "is_weekend",
+      "season",
+      "hour_sin",
+      "hour_cos",
+      "month_sin",
+      "month_cos",
+      "day_of_week_sin",
+      "day_of_week_cos",
+      "route",
+      "distance_band",
+      "is_long_haul",
+      "distance_log",
+      "carrier_historical_delay_rate",
+      "carrier_historical_flight_count",
+      "origin_historical_delay_rate",
+      "origin_historical_flight_count",
+      "destination_historical_delay_rate",
+      "destination_historical_flight_count",
+      "route_historical_delay_rate",
+      "route_historical_flight_count",
+      "origin_hourly_departures",
+      "dest_hourly_arrivals"
+    ]
+  },
+  "models": {
+    "Balanced LR": {
+      "C": 1.0,
+      "class_weight": "balanced",
+      "random_state": 42,
+      "max_iter": 1000,
+      "calibration": null,
+      "threshold": null
+    },
+    "Tuned XGBoost": {
+      "n_estimators": 250,
+      "max_depth": 6,
+      "learning_rate": 0.03,
+      "min_child_weight": 10,
+      "subsample": 0.9,
+      "colsample_bytree": 0.75,
+      "reg_lambda": 10.0,
+      "scale_pos_weight": 2.859,
+      "random_state": 42,
+      "calibration": null,
+      "threshold": null
+    }
+  },
+  "metrics": {
+    "ranking": "scikit-learn Average Precision (AP); not trapezoidal PR area",
+    "selection": "No feature/model selection from the held-out test; validation-only comparison",
+    "results": [
+      {
+        "feature_set": "full",
+        "n_features": 31,
+        "model": "Balanced LR",
+        "val_average_precision": 0.2532,
+        "val_roc_auc": 0.6467
+      },
+      {
+        "feature_set": "full",
+        "n_features": 31,
+        "model": "Tuned XGBoost",
+        "val_average_precision": 0.2112,
+        "val_roc_auc": 0.6278
+      },
+      {
+        "feature_set": "full_congestion",
+        "n_features": 33,
+        "model": "Balanced LR",
+        "val_average_precision": 0.2533,
+        "val_roc_auc": 0.6475
+      },
+      {
+        "feature_set": "full_congestion",
+        "n_features": 33,
+        "model": "Tuned XGBoost",
+        "val_average_precision": 0.2107,
+        "val_roc_auc": 0.6286
+      }
+    ]
+  }
+}

@@ -240,8 +240,9 @@ def run_experiments(
 ) -> dict[str, Any]:
     """Run ablations and tuned XGBoost, export validation-only deliverables.
 
-    The official held-out test data is *never used here*. Evaluation/calibration
-    lead should perform final test evaluation with the frozen chosen model.
+    This component run does not train, tune, or score on the test split; its
+    exported predictions and metrics are validation-only. The pipeline still
+    constructs all chronological partitions.
     Outputs are ignored by git under the team's existing .gitignore rules.
     """
     from flight_delay.data.pipeline import build_data_pipeline
@@ -251,7 +252,7 @@ def run_experiments(
     output_dir.mkdir(parents=True, exist_ok=True)
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    train, validation, _test_untouched = build_data_pipeline(data_path)
+    train, validation, _test_split = build_data_pipeline(data_path)
     X_train, y_train = split_features_and_target(train)
     X_validation, y_validation = split_features_and_target(validation)
     training_dates = pd.to_datetime(train[["year", "month", "day"]])
@@ -346,7 +347,7 @@ def run_experiments(
         "n_jobs": n_jobs,
         "train_rows": len(y_train),
         "validation_rows": len(y_validation),
-        "test_policy": "untouched; reserved for independent final evaluation",
+        "test_policy": "not scored by this validation-only component run",
         "train_first_date": str(training_dates.min().date()),
         "train_last_date": str(training_dates.max().date()),
         "validation_first_date": str(validation_dates.min().date()),

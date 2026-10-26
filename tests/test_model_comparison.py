@@ -60,7 +60,8 @@ def synthetic_flights():
 
 def test_approved_features_match_legacy_selector(synthetic_flights):
     train,_ = synthetic_flights
-    assert len(FEATURE_SETS['full']) == 33
+    assert len(FEATURE_SETS['full']) == 31
+    assert len(FEATURE_SETS['full_congestion']) == 33
     pd.testing.assert_frame_equal(
         select_model_features(train),select_xgboost_features(train)
     )

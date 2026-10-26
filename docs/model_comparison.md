@@ -4,12 +4,13 @@ This document compares **modeling candidates only**. Probability calibration,
 operating thresholds, decision utility, final test evaluation and rescheduling
 remain outside this change (Lakshya's responsibility).
 
-## Previously reported chronological validation results
+## Historical chronological validation results (superseded)
 
-The scores below are from the previously executed XGBoost experiment
-(`docs/xgboost_results.md`) and Ankit's saved Logistic Regression notebook
-(`notebooks/03_logistic_regression.ipynb`). They are not results of an
-independent rerun of `scripts/compare_models.py`.
+The scores below are retained only to document earlier component experiments.
+They predate the direct comparison described below and are not the current
+canonical model comparison or the frozen calibrated evaluation. The earlier
+notebook's balanced Logistic Regression AP of `0.206450` is superseded by the
+direct shared-pipeline value `0.206047`.
 
 | Model | Average Precision (AP) | ROC-AUC |
 |---|---:|---:|
@@ -18,8 +19,10 @@ independent rerun of `scripts/compare_models.py`.
 | XGBoost, tuned `full` features | **0.239206** | **0.629462** |
 
 Validation population: **50,466 flights** (September–early November 2013),
-positive arrival-delay prevalence **15.64%**. The same chronological pipeline
-and `full` feature allowlist were used for these reported experiments.
+positive arrival-delay prevalence **15.64%**. These component results used
+their recorded experiment configurations; they should not be assumed to have
+the same fitted estimators, calibration, or exact feature contract as the
+canonical frozen evaluation.
 
 Against balanced Logistic Regression, tuned XGBoost shows an **absolute AP
 advantage of 0.032756** (about **15.9% relative**), and an **absolute ROC-AUC
@@ -48,10 +51,10 @@ balanced-model AP of `0.206450`, whereas the direct comparison here reports
 `0.206047`. The difference is not a modelling error: the notebook predates the
 shared-pipeline refactor, in which Logistic Regression previously built the data
 twice and read an unused raw CSV, slightly perturbing the fitted pipeline. The
-**canonical value is `0.206047`**, produced by `scripts/compare_models.py` on the
-current `main` branch, which builds the dataset once and fits all candidates on
-identical rows. This number reproduces exactly on re-run (verified), so the
-notebook figure should be treated as the superseded pre-refactor value.
+**direct-comparison value is `0.206047`**, produced by `scripts/compare_models.py`,
+which builds the dataset once and fits all candidates on identical rows. This is
+an uncalibrated validation comparison, not the canonical frozen model evaluation;
+see [`canonical_evaluation.json`](canonical_evaluation.json) for the latter.
 
 These are model-comparison results on validation data, not final
 held-out test results.

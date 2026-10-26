@@ -34,7 +34,7 @@ def main() -> None:
     frozen = joblib.load(FROZEN)["xgboost_tuned_full"]
     model, calibrator, threshold = frozen["model"], frozen["calibrator"], frozen["threshold"]
 
-    # Validation flights already carry all pre-departure features (test stays untouched).
+    # This example predicts validation flights only; it does not score the test split.
     _, validation, _ = build_data_pipeline(DATA)
     X = select_model_features(validation, "full")
 

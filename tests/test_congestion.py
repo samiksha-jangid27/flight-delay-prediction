@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 import pytest
 
+from flight_delay.data import pipeline as data_pipeline
 from flight_delay.features.congestion import add_congestion_features
 
 
@@ -50,3 +52,35 @@ def test_does_not_mutate_input():
 def test_missing_columns_raise():
     with pytest.raises(ValueError):
         add_congestion_features(pd.DataFrame({"year": [2013]}))
+
+
+def test_pipeline_congestion_counts_include_undefined_outcome_flights(monkeypatch):
+    """Regression: congestion must be counted over the full schedule BEFORE
+    rows with a missing arrival outcome are dropped. A cancelled/diverted flight
+    still occupied a scheduled slot and must contribute to the count."""
+    frame = pd.DataFrame(
+        {
+            "year": [2013] * 3,
+            "month": [1] * 3,
+            "day": [1] * 3,
+            "origin": ["EWR", "EWR", "EWR"],
+            "dest": ["ORD", "ORD", "MIA"],
+            "carrier": ["UA"] * 3,
+            "hour": [8, 8, 8],
+            "sched_arr_time": [1030, 1045, 1200],
+            "distance": [100] * 3,
+            "arr_delay": [10.0, np.nan, 30.0],  # middle flight has no outcome
+        }
+    )
+    monkeypatch.setattr(data_pipeline, "load_flights", lambda _: frame.copy())
+    monkeypatch.setattr(
+        data_pipeline,
+        "chronological_split",
+        lambda data: (data, data.iloc[:0].copy(), data.iloc[:0].copy()),
+    )
+
+    train, _, _ = data_pipeline.build_data_pipeline("unused.csv")
+
+    # Both surviving EWR/hour-8 flights must still see all 3 scheduled departures.
+    assert len(train) == 2
+    assert (train["origin_hourly_departures"] == 3).all()

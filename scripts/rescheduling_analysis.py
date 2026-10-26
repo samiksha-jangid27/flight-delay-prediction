@@ -8,10 +8,10 @@ cost model, and writes a what-if report, a cost-ratio sensitivity sweep, a
 net-benefit curve and a figure per model.
 
 No operational cost has been approved; every quantity is a planning-stage
-what-if expressed relative to the delay cost. By default the analysis runs on
-the validation (development) partition, consistent with the project's frozen
-final-test discipline. Point it at a ``*_test.csv`` only with the deliberate
-decision to spend the one-time held-out test, which this script does not make.
+what-if expressed relative to the delay cost. by default the analysis runs on the validation (development) partition. This
+script does not score the test partition. The calendar test period has already
+appeared in earlier project work, so this analysis is not an independent test
+evaluation.
 
 Run from the repository root (after a validation run):
     python scripts/rescheduling_analysis.py --eval-dir reports/evaluation
@@ -83,11 +83,15 @@ def analyze_model(
     pd.DataFrame(report["cost_ratio_sweep"]).to_csv(
         output / f"{name}_cost_ratio_sweep.csv", index=False
     )
+    partitions = sorted(partition.title() for partition in frame.partition.unique())
+    partition_label = ", ".join(partitions) if partitions else "Unspecified partition"
     _curve_figure(
         curve,
         cost,
         frozen_threshold,
-        f"{name}: rescheduling net benefit (ratio {cost.cost_ratio:g}, recovery {cost.recovery:g})",
+        f"{partition_label} net benefit\n"
+        f"{name.replace('_', ' ')} (ratio {cost.cost_ratio:g}, "
+        f"recovery {cost.recovery:g})",
         output / f"{name}_net_benefit.png",
     )
     return report

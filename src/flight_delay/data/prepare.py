@@ -13,7 +13,10 @@ def prepare_model_data(
     target_threshold: float = 15,
 ) -> dict[str, tuple[pd.DataFrame, pd.Series]]:
     """
-    Build the complete leakage-safe model-ready dataset.
+    Build the shared model-ready dataset with prior-date historical features.
+
+    Prior-date ordering is enforced, but exact historical outcome availability
+    at a prediction timestamp is not verified.
 
     Returns:
         Dictionary containing train, validation, and test

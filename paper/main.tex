@@ -45,19 +45,25 @@
 
 \begin{abstract}
 We predict whether a scheduled flight will arrive at least fifteen minutes late,
-using only information available before departure, and study whether the
+using schedule fields and strictly prior-date histories under an explicit,
+unverified outcome-availability assumption, and study whether the
 resulting probabilities can support proactive rescheduling. Using one year of
 2013 US flights originating from the three major New York airports, we build a
-leakage-safe pipeline whose defences operate at three levels: a pre-departure
+leakage-aware pipeline whose safeguards operate at three levels: a pre-departure
 feature allowlist, historical delay statistics aggregated from prior calendar
-dates only, and a strictly chronological train/validation/test split. We
-engineer temporal (cyclic), route, prior-date historical and schedule-based
-airport-congestion features, and train
+dates only, and a strictly chronological train/validation/test split. The
+frozen 31-feature evaluation uses temporal (cyclic), route and prior-date
+historical features. A separate experiment adds two schedule-based airport-load
+proxies and evaluates them on validation only; that 33-feature variant has no
+held-out test score. We train
 a class-balanced Logistic Regression and a tuned XGBoost classifier. Probabilities
 are calibrated on a held-out late-training window (isotonic regression, selected
 by validation Brier score), and a single operating threshold per model is frozen
-on validation before one-time evaluation on the held-out test set. XGBoost is the
-stronger held-out candidate (test PR-AUC $0.338$, ROC-AUC $0.599$) but absolute
+on validation before frozen evaluation on the held-out test set. This calendar
+test period was also used in an earlier pre-congestion experiment and later
+reproduced for audit, so it was not untouched throughout development. XGBoost
+is the stronger descriptive held-out candidate (test Average Precision
+$0.337$, ROC-AUC $0.599$) but absolute
 discrimination is modest, and a proper-score audit shows the calibrated
 probabilities are not convincingly better than a prevalence baseline. We then
 derive an offline cost-sensitive rescheduling rule with a closed-form net-benefit
@@ -90,12 +96,13 @@ emit probabilities that do not correspond to real-world frequencies, which is
 fatal for any downstream decision rule that thresholds a probability.
 
 This report, covering the Advanced Machine Learning phase of the project, makes
-four contributions. First, a leakage-safe data pipeline with three independent
+four contributions. First, a leakage-aware data pipeline with three independent
 defences (Section~\ref{sec:method}). Second, documented and unit-tested feature
 engineering, including a cyclic time encoding and prior-date historical
-aggregates (Section~\ref{sec:features}). Third, a calibrated, chronologically
-fair evaluation of a Logistic Regression baseline against a tuned XGBoost model,
-with a frozen one-time test (Section~\ref{sec:results}). Fourth, an offline
+aggregates (Section~\ref{sec:features}). Third, a calibrated chronological
+evaluation of a Logistic Regression baseline against a tuned XGBoost model,
+with frozen held-out results and explicit test-period reuse disclosure
+(Section~\ref{sec:results}). Fourth, an offline
 rescheduling what-if analysis built on explicit cost assumptions, including the
 cost-optimal operating threshold and a sensitivity study
 (Section~\ref{sec:resched}). Throughout, we favour transparent reporting of
@@ -128,7 +135,8 @@ select by a proper scoring rule.
 \textbf{Evaluation under imbalance.} For skewed classes, precision--recall
 analysis is more informative than ROC alone~\cite{davis,saito}, because the ROC
 curve can look optimistic when the negative class dominates. We therefore
-report PR-AUC as the primary ranking metric, alongside ROC-AUC and the proper
+report scikit-learn Average Precision (AP) as the primary ranking metric,
+alongside ROC-AUC and the proper
 scores (Brier, log loss) that also drive our calibration selection. All
 estimators use the standard scikit-learn and XGBoost
 implementations~\cite{sklearn,xgboost}.
@@ -152,7 +160,7 @@ derived from the arrival outcome. Flights whose arrival outcome is undefined
 (missing arrival delay, e.g.\ cancellations) are dropped rather than imputed,
 since their label is not defined. Validation uses a chronological split so that
 the model is always trained on the past and evaluated on the future. The primary
-metrics are PR-AUC and ROC-AUC, supported by precision, recall, and the proper
+metrics are Average Precision (AP) and ROC-AUC, supported by precision, recall, and the proper
 scores used for calibration.
 
 \section{Dataset and Exploratory Analysis}
@@ -205,7 +213,7 @@ structure the features are designed to exploit
   \centering
   \includegraphics[width=0.78\columnwidth]{target-distribution}
   \caption{Target class balance: delayed versus on-time arrivals. The minority
-  (delayed) class motivates PR-AUC and class weighting.}
+  (delayed) class motivates Average Precision and class weighting.}
   \label{fig:target}
 \end{figure}
 
@@ -246,9 +254,11 @@ structure the features are designed to exploit
 
 \section{Feature Engineering}
 \label{sec:features}
-All features derive strictly from the schedule and from historical outcomes on
-prior calendar dates, yielding $33$ model features in total. Four engines
-contribute, each documented and unit-tested.
+The canonical frozen model uses 31 features derived from the schedule and
+historical outcomes on prior calendar dates. Two additional schedule-derived
+airport-load proxies form a 33-feature variant used only in a validation
+ablation, not in the held-out test evaluation. The feature engines are
+documented and unit-tested.
 
 \subsection{Temporal features}
 Calendar signals (\code{day\_of\_week}, \code{is\_weekend}, \code{season}) are
@@ -300,24 +310,27 @@ availability-time leakage therefore remains a stated caveat.
 \end{figure}
 
 \subsection{Airport congestion features}
-To represent \emph{airport congestion} directly---rather than only through the
-historical volume proxies above---we add two schedule-derived counts:
+To probe schedule-based airport-load proxies beyond the historical volume
+features above, we examine two schedule-derived counts:
 \code{origin\_hourly\_departures}, the number of flights scheduled to depart the
-same origin in the same (date, hour), and \code{dest\_hourly\_arrivals}, the
-analogous scheduled arrival load at the destination. Both are read from the
-timetable, so they are known before any flight departs and introduce no leakage.
-On this dataset their marginal value is small: they rank low in model importance
-(below the top~30 encoded features) and are weakly, negatively correlated with
-delay, because the scheduled hour already captures most of the time-of-day
-congestion structure. We include them for completeness and because a larger,
-multi-airport dataset would likely make an explicit congestion signal more
-informative.
+same origin in the same (date, hour), and \code{dest\_hourly\_arrivals}, the analogous scheduled arrival load at the
+destination. The counts use the NYC-origin timetable, not all airport
+operations. Destination arrivals are grouped by departure date and scheduled
+arrival hour; flights crossing midnight are not rolled to the next calendar
+date. These are schedule-based proxies, not measurements of realized
+congestion. A validation-only ablation found small marginal differences, but
+does not establish that congestion is unimportant on a larger or more complete
+airport dataset. The proxies are excluded from the canonical 31-feature
+held-out evaluation.
 
 \subsection{The pre-departure allowlist}
-A single feature contract admits only approved predictors
-(schedule, route, historical, congestion) into the design matrix and blocks the
-target, every post-departure column, and identifiers. The contract is enforced in
-code and in tests, so leakage cannot enter by accident.
+A single feature contract admits only approved predictors into the design matrix
+and blocks the target, every post-departure column, and identifiers. The
+canonical \code{full} allowlist uses schedule, route and historical columns;
+the separate \code{full\_congestion} validation variant additionally admits
+the two congestion proxies. The contract is enforced in code and tests, but
+prior-date outcome availability at the exact prediction timestamp remains an
+unverified assumption.
 
 \section{Methodology}
 \label{sec:method}
@@ -364,7 +377,9 @@ chronological folds grouped by whole flight dates and separated by a one-date
 embargo so that no fold shares a date across the train/validation boundary. The
 search ranged over tree count, depth, learning rate, minimum child weight, row
 and column subsampling, $L_2$ regularisation and positive-class weighting; the
-held-out test set was never consulted.
+held-out test set was not used in this hyperparameter search. The same
+chronological test period had been evaluated in an earlier pre-congestion
+experiment, so it was not globally unseen during project development.
 
 \subsection{Calibration}
 Each model's calibration-window scores are mapped by three candidates---raw
@@ -379,9 +394,11 @@ precision-floor variants are reported only as illustrative sensitivity, as no
 operational cost was approved). The selected calibration map and threshold, the
 fitted estimators, the dataset hash and the dependency versions are then
 \emph{frozen} to disk. Only after this does the final stage load the frozen
-objects and evaluate the held-out test set \emph{exactly once}; it cannot refit
-or reselect. This discipline prevents the test set from leaking into any
-modelling decision.
+objects and evaluate the held-out test set; it cannot refit or reselect. The
+published frozen results were subsequently reproduced for an audit without
+changing any modelling decision. Because this calendar period was also used in
+an earlier pre-congestion experiment, it must not be described as a test set
+that was never previously inspected.
 
 \section{Results}
 \label{sec:results}
@@ -392,11 +409,11 @@ models have low precision ($\approx 22\%$) at their operating points, reflecting
 the difficulty of the task. ROC and PR curves appear in
 Figs.~\ref{fig:roc}--\ref{fig:pr}, and the confusion matrices at the frozen
 thresholds in Fig.~\ref{fig:confusion}. On validation alone the balanced LR in
-fact edges XGBoost, and its PR-AUC advantage is marginally significant under the
-date-block bootstrap (Section~\ref{sec:results}\,C); the ROC-AUC and $F_1$ gaps
-are not. Because this ordering reverses on the held-out test, we defer the model
-choice to that one-time test (Section~\ref{sec:results}\,C), where XGBoost is the
-stronger candidate on every metric. Both operating points favour recall over precision---catching
+fact edges XGBoost on AP and ROC-AUC, but the two differences are tiny and,
+as the date-block bootstrap below shows, not statistically distinguishable; we
+therefore defer the model choice to the held-out test
+(Section~\ref{sec:results}\,C), where XGBoost is the stronger candidate on every
+metric. Both operating points favour recall over precision---catching
 roughly $60\%$ of true delays at the cost of a large false-alarm count
 (Fig.~\ref{fig:confusion})---which is the intended behaviour under class
 weighting and is exactly what the cost analysis of Section~\ref{sec:resched}
@@ -419,10 +436,10 @@ later prices.
   \resizebox{\columnwidth}{!}{%
   \begin{tabular}{lrrrrrr}
     \toprule
-    Model & Thr. & PR-AUC & ROC-AUC & Prec. & Rec. & Brier \\
+    Model & Thr. & AP & ROC-AUC & Prec. & Rec. & Brier \\
     \midrule
-    Balanced LR    & $0.345$ & $0.230$ & $0.638$ & $0.229$ & $0.576$ & $0.152$ \\
-    Tuned XGBoost  & $0.257$ & $0.212$ & $0.626$ & $0.216$ & $0.596$ & $0.137$ \\
+    Balanced LR    & $0.344$ & $0.223$ & $0.636$ & $0.224$ & $0.605$ & $0.151$ \\
+    Tuned XGBoost  & $0.250$ & $0.213$ & $0.628$ & $0.216$ & $0.593$ & $0.137$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -431,7 +448,7 @@ later prices.
   \centering
   \includegraphics[width=\columnwidth]{val-roc}
   \caption{Validation ROC curves. Discrimination is modest in absolute terms
-  (ROC-AUC $\approx 0.63$).}
+  (ROC-AUC $\approx 0.63$--$0.64$).}
   \label{fig:roc}
 \end{figure}
 
@@ -447,7 +464,7 @@ later prices.
 Isotonic regression minimises validation Brier and log loss for both models and
 is selected. A proper-score audit, however, tempers any success claim: a constant
 predictor set to the late-training prevalence attains a Brier of $0.138$, which
-the balanced-LR isotonic probabilities ($0.152$) \emph{fail} to beat and the
+the balanced-LR isotonic probabilities ($0.151$) \emph{fail} to beat and the
 XGBoost isotonic probabilities ($0.137$) beat only narrowly. Improvement over
 severely miscalibrated raw scores is therefore not sufficient evidence of useful
 probability forecasts. Table~\ref{tab:calib} reports the proper scores and the
@@ -469,10 +486,10 @@ diagram (Fig.~\ref{fig:reliability}) is reasonable but not strong.
     \toprule
     Model & Variant & Brier & Log loss & Mean pred. \\
     \midrule
-    Balanced LR   & raw       & $0.520$ & $1.389$ & $0.780$ \\
-    Balanced LR   & isotonic  & $0.152$ & $0.518$ & $0.308$ \\
-    Tuned XGBoost & raw       & $0.303$ & $0.850$ & $0.537$ \\
-    Tuned XGBoost & isotonic  & $\mathbf{0.137}$ & $\mathbf{0.442}$ & $0.231$ \\
+    Balanced LR   & raw       & $0.522$ & $1.396$ & $0.782$ \\
+    Balanced LR   & isotonic  & $0.151$ & $0.482$ & $0.305$ \\
+    Tuned XGBoost & raw       & $0.306$ & $0.860$ & $0.540$ \\
+    Tuned XGBoost & isotonic  & $\mathbf{0.137}$ & $\mathbf{0.443}$ & $0.231$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -486,31 +503,28 @@ diagram (Fig.~\ref{fig:reliability}) is reasonable but not strong.
 \end{figure}
 
 \subsection{Held-out test}
-The frozen one-time test (Table~\ref{tab:test}) favours XGBoost on PR-AUC,
+The frozen 31-feature test (Table~\ref{tab:test}) favours XGBoost on AP,
 ROC-AUC, precision, recall and $F_1$. Because prevalence differs between
 validation ($0.156$) and test ($0.269$), the two sets' PR-based metrics are not
-directly comparable as measures of improvement. The comparison is also
-window-dependent: a paired date-block bootstrap on \emph{validation} (300
-resamples) gives differences (XGBoost minus LR) whose $95\%$ intervals favour LR
-on PR-AUC ($[-0.033, -0.001]$, excluding zero) but include zero for ROC-AUC
-($[-0.029, 0.005]$) and $F_1$ ($[-0.022, 0.005]$). On the held-out test the
-ordering reverses and XGBoost leads on every metric. The between-model difference
-is therefore window-dependent and, on balance, not robustly established in
-either model's favour; we select XGBoost on the held-out test and its cost
-behaviour (Section~\ref{sec:resched}), not on a significant ranking gap.
+directly comparable as measures of improvement. A paired date-block bootstrap on
+validation (300 resamples) gives differences (XGBoost minus LR) whose $95\%$
+intervals include zero (e.g.\ AP $[-0.027, 0.011]$), so the ranking advantage
+is descriptive rather than statistically established. The test period was also
+used for an earlier pre-congestion experiment and was later replayed to verify
+the audit; it was not untouched across the full development history.
 
 \begin{table}[t]
-  \caption{Held-out test metrics (frozen one-time evaluation).}
+  \caption{Held-out test metrics for the frozen 31-feature model.}
   \label{tab:test}
   \centering
   \setlength{\tabcolsep}{4pt}
   \resizebox{\columnwidth}{!}{%
   \begin{tabular}{lrrrrr}
     \toprule
-    Model & PR-AUC & ROC-AUC & Prec. & Rec. & $F_1$ \\
+    Model & AP & ROC-AUC & Prec. & Rec. & $F_1$ \\
     \midrule
-    Balanced LR    & $0.296$ & $0.545$ & $0.300$ & $0.465$ & $0.364$ \\
-    Tuned XGBoost  & $\mathbf{0.338}$ & $\mathbf{0.599}$ & $\mathbf{0.332}$ & $\mathbf{0.542}$ & $\mathbf{0.412}$ \\
+    Balanced LR    & $0.294$ & $0.544$ & $0.296$ & $0.488$ & $0.369$ \\
+    Tuned XGBoost  & $\mathbf{0.337}$ & $\mathbf{0.599}$ & $\mathbf{0.335}$ & $\mathbf{0.532}$ & $\mathbf{0.411}$ \\
     \bottomrule
   \end{tabular}}
 \end{table}
@@ -523,16 +537,18 @@ share, followed by the \code{season} flag and a high-delay carrier indicator.
 This agrees with the exploratory finding that delay risk is primarily driven by
 when a flight departs (Figs.~\ref{fig:hourmonth}), and confirms that the
 engineered temporal features carry real model weight rather than mere decoration.
-The explicit congestion counts, by contrast, rank well outside the top ten,
-confirming that the scheduled hour already absorbs most time-of-day congestion.
+In the validation-only ablation, adding these two features changed XGBoost AP
+from $0.2112$ to $0.2107$ and balanced-LR AP from $0.2532$ to $0.2533$. These
+small differences do not establish that airport congestion is unimportant.
 Importance here is model-relative and does not imply causation; correlated
 calendar features can share or dilute one another's attributed gain.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.95\columnwidth]{xgb-importance}
-  \caption{XGBoost gain importance for the ten most influential encoded
-  features. Time-of-day terms dominate, matching the exploratory structure.}
+  \caption{Gain importance for the ten most influential encoded features in the
+  early-training fit of the frozen XGBoost model. Time-of-day terms dominate,
+  matching the exploratory structure.}
   \label{fig:importance}
 \end{figure}
 
@@ -597,8 +613,8 @@ Fig.~\ref{fig:netbenefit}).
     $0.05$ & $0.063$ & $+0.075$ & $+0.075$ \\
     $0.10$ & $0.125$ & $+0.025$ & $+0.034$ \\
     $0.15$ & $0.188$ & $-0.016$ & $+0.005$ \\
-    $0.20$ & $0.250$ & $-0.046$ & $-0.012$ \\
-    $0.25$ & $0.313$ & $-0.049$ & $-0.020$ \\
+    $0.20$ & $0.250$ & $-0.049$ & $-0.012$ \\
+    $0.25$ & $0.313$ & $-0.056$ & $-0.018$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -606,9 +622,9 @@ Fig.~\ref{fig:netbenefit}).
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{xgb-netbenefit}
-  \caption{XGBoost net saving per flight versus action threshold. The curve
-  crosses the no-action line, and the cost-optimal $\tau^\star$ moves with the
-  assumed cost ratio.}
+  \caption{Validation XGBoost net saving per flight versus action threshold
+  (cost ratio 0.25 and recovery 0.8). The curve crosses the no-action line,
+  and the cost-optimal $\tau^\star$ moves with the assumed cost ratio.}
   \label{fig:netbenefit}
 \end{figure}
 
@@ -631,19 +647,14 @@ the current probabilities can deliver.
 \section{Discussion and Limitations}
 \label{sec:discussion}
 The results are deliberately unembellished. Discrimination is modest
-(ROC-AUC $\approx 0.60$), the calibrated probabilities barely improve on a
-prevalence baseline in proper-score terms, and the between-model difference is
-not statistically established. This ceiling is, however, largely expected rather
-than a modelling failure: by construction the predictor sees only schedule,
-route and prior-date history, and is denied the single strongest driver of
-day-of-operation delay---weather---together with real-time congestion and
-upstream-aircraft state, none of which is available at the pre-departure
-decision point we committed to. The gain-importance ranking
-(Fig.~\ref{fig:importance}) reflects exactly this: the model extracts what
-temporal and historical structure it can, but that structure bounds how far any
-pre-departure classifier on this feature set can go. We therefore read
-ROC-AUC $\approx 0.60$ as an honest estimate of the information actually present
-before departure, not as an artefact of weak modelling. The rescheduling analysis shows a genuine but
+(ROC-AUC $\approx 0.60$), the calibrated probabilities do not convincingly
+improve on a prevalence baseline in proper-score terms, and the between-model
+difference is not statistically established. These results describe the tested
+models and dataset; they do not establish a performance ceiling. Forecast
+weather, live operational conditions and upstream-aircraft state are potential
+additional signals whose value was not evaluated here. The gain-importance
+ranking (Fig.~\ref{fig:importance}) describes this fitted model only and does
+not bound other pre-departure classifiers. The rescheduling analysis shows a
 narrow operating regime. Key limitations: (i) historical features guarantee
 prior-date ordering but not exact availability-time safety; (ii) the data cover a
 single year and only three New York origin airports, limiting generalisation;
@@ -652,14 +663,15 @@ full original training period and is not fully nested; (iv) the rescheduling
 cost model assumes homogeneous, independent per-flight costs with no network
 feedback; (v) delay prevalence shifts substantially across the chronological
 partitions (Fig.~\ref{fig:prevalence}), so prevalence-dependent metrics are not
-directly comparable across windows; and (vi) the explicit scheduled-congestion
-features add little here (single hub region, one year), so their value remains to
-be demonstrated on a larger multi-airport dataset. None of the
+directly comparable across windows; and (vi) the validation-only congestion
+ablation changed the aggregate ranking metrics only slightly in this dataset,
+which does not establish the features' value in a larger multi-airport setting.
+None of the
 results supports a production-readiness claim.
 
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
-We delivered a leakage-safe, calibrated and honestly evaluated baseline for
+We delivered a leakage-aware, calibrated and honestly evaluated baseline for
 pre-departure flight-delay prediction, together with an offline rescheduling
 what-if analysis grounded in explicit cost assumptions. XGBoost is the stronger
 descriptive candidate and the better basis for a cost-sensitive rescheduling

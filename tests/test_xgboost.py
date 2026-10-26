@@ -167,6 +167,7 @@ def test_runner_exports_compatible_validation_artifacts(training_sample, monkeyp
     import sys
     from types import ModuleType
 
+    from flight_delay.features.model_features import FEATURE_SETS
     from flight_delay.models.xgboost_model import run_experiments
 
     X, y, dates = training_sample
@@ -217,8 +218,9 @@ def test_runner_exports_compatible_validation_artifacts(training_sample, monkeyp
     assert predictions["flight_id"].tolist() == validation["id"].tolist()
     assert predictions["y_true"].tolist() == validation["is_delayed"].tolist()
     assert predictions["y_probability"].between(0, 1).all()
-    assert len(result["leaderboard"]) == 4
+    assert len(result["leaderboard"]) == len(FEATURE_SETS) + 1
+    assert set(result["leaderboard"]["feature_set"]) == {*FEATURE_SETS, "full"}
     manifest = json.loads((outputs / "xgboost_manifest.json").read_text())
-    assert manifest["test_policy"].startswith("untouched")
+    assert manifest["test_policy"] == "not scored by this validation-only component run"
     assert manifest["train_rows"] == 96
     assert manifest["validation_rows"] == 32

@@ -81,9 +81,11 @@ def add_historical_delay_features(
     target_col: str = "is_delayed",
 ) -> pd.DataFrame:
     """
-    Add leakage-safe historical delay features.
+    Add historical delay features from prior calendar dates.
 
     Historical statistics are computed from previous calendar dates only.
+    This enforces date ordering, but does not verify outcome availability at a
+    specific prediction timestamp.
 
     Added features:
     - carrier historical delay rate/count

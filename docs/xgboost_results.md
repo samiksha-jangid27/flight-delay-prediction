@@ -3,7 +3,10 @@
 **Project:** Flight Delay Prediction (Project 21, Team T022)
 **Component owner:** Shubhaang Kataruka — XGBoost and Hyperparameter Tuning
 **Evaluation date:** 20 October 2026
-**Status:** Training and chronological validation complete; final held-out test evaluation and calibration pending.
+**Status:** Historical XGBoost component record. Its validation experiment was
+completed before the team-level calibration and frozen held-out evaluation
+documented in `evaluation_results.md`; the status and results below are not the
+current end-to-end evaluation.
 
 ## Objective and data
 
@@ -99,7 +102,7 @@ Importance is **model-relative** and does not establish causal effects. Correlat
 
 ## Verification and reproducibility
 
-The initial repository suite passed **33 tests**, and after adding the XGBoost component the combined suite passed **42 tests**, including **9 XGBoost-specific tests**. *(These are historical snapshots from the XGBoost-integration phase; the full project suite now stands at **223 tests** — see the main README.)* The final selected fitted pipeline was saved, reloaded, and verified to reproduce every saved validation probability (within floating-point tolerance), matching all **50,466 flight IDs** and labels. This verification was performed on the developer's Mac with Python 3.12.15 and XGBoost 3.4.1.
+The initial repository suite passed **33 tests**, and after adding the XGBoost component the combined suite passed **42 tests**, including **9 XGBoost-specific tests**. *(These are historical snapshots from the XGBoost-integration phase; the current repository suite has **224 tests** — see the main README.)* The final selected fitted pipeline was saved, reloaded, and verified to reproduce every saved validation probability (within floating-point tolerance), matching all **50,466 flight IDs** and labels. This verification was performed on the developer's Mac with Python 3.12.15 and XGBoost 3.4.1.
 
 Commands (run from repository root in the prepared environment):
 
@@ -122,12 +125,29 @@ reports/results/xgboost_manifest.json
 
 The validation CSV exposes `flight_id,flight_date,y_true,y_probability,model_name,experiment` for subsequent row-aligned comparisons. `flight_id` is a join key only, never a predictor. Share the probability data and saved model with the evaluation lead by an approved method; **generated artifacts are not included in the Git commit**.
 
-## Limitations and evaluation handoff
+## Limitations and later team-level evaluation
 
-- **No held-out test score yet.** Validation was used to compare/select the feature sets and tuned candidate, so its AP and ROC-AUC are **selection-set results**, not an independent estimate of final generalization.
-- **No probability calibration or operational threshold.** The evaluation lead should use an appropriate calibration-only split or independent/out-of-fold predictions, avoiding optimistic calibration assessment on the same data used for selection.
+The statements below describe the scope of this historical XGBoost component
+experiment, not the current project status. Later team-level calibration and
+frozen evaluation results are recorded in
+[`evaluation_results.md`](evaluation_results.md) and the tracked
+[`canonical_evaluation.json`](canonical_evaluation.json).
+
+- **This component experiment did not score the test set.** Its validation AP
+  and ROC-AUC are selection-set results and are not the canonical frozen
+  evaluation values.
+- **This component experiment did not calibrate probabilities or select an
+  operational threshold.** The later team evaluation performed calibration and
+  threshold selection on validation, then applied the frozen choices to test.
+- **Test-period history:** the same calendar test period was used in an earlier
+  pre-congestion experiment and reproduced during the later audit. It was not
+  used to select models or thresholds in the frozen run, but should not be
+  described as untouched throughout project history.
 - **Historical-label timing is an upstream caveat.** Features are based on earlier calendar dates, but it has not been proven that *all* previous-date arrival outcomes would have been observable before each prediction timestamp. This should be tested against outcome availability if the model is deployed operationally.
 - **Limited geographic/temporal coverage.** The 2013 NYC-origin dataset does not establish performance across modern routes or all airports; cancellations and diversions with undefined arrival delays are outside this classifier.
-- **Comparative evaluation pending.** Once the Logistic Regression baseline is available, compare both models using the same date partitions, outcomes and metric definitions. Keep the held-out test set untouched until all choices are frozen.
 
-**Phase 1 XGBoost status:** Implementation, baseline experiments, tuning, validation predictions, importance, and artifact-reload verification are complete. Model comparison, independent final evaluation, calibration, and any rescheduling-impact analysis are team-level next steps.
+**Historical component status:** implementation, baseline experiments, tuning,
+validation predictions, importance, and artifact-reload verification were
+completed. Subsequent team-level work completed model comparison, calibration,
+frozen evaluation, and rescheduling analysis; refer to the canonical evaluation
+record rather than treating this handoff as current project status.

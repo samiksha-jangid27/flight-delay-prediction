@@ -44,7 +44,7 @@ Availability key:
 |---|---|---|
 | `is_delayed` | int8 | **Target.** 1 if `arr_delay >= 15`, else 0. Base rate ≈ 25.9%. |
 
-### Historical features (`features/historical.py` — Samiksha, leakage-safe, past dates only)
+### Historical features (`features/historical.py` — Samiksha, prior calendar dates only)
 | Column | Type | Description |
 |---|---|---|
 | `carrier_historical_delay_rate` | float | Carrier delay rate over prior dates. |
@@ -56,11 +56,19 @@ Availability key:
 | `route_historical_delay_rate` | float | Route delay rate over prior dates. |
 | `route_historical_flight_count` | int | Route flights on prior dates. |
 
+These features exclude same-day and future outcomes. Their availability at the
+exact prediction timestamp has not been verified; see the
+[data contract](data_contract.md).
+
 ### Airport congestion features (`features/congestion.py`)
 | Column | Type | Description |
 |---|---|---|
-| `origin_hourly_departures` | int32 | Flights scheduled to depart the same origin in the same (date, hour). Schedule-derived; known pre-departure. |
-| `dest_hourly_arrivals` | int32 | Flights scheduled to arrive at the same destination in the same (date, scheduled-arrival hour). Schedule-derived; known pre-departure. |
+| `origin_hourly_departures` | int32 | NYC-origin flights scheduled to depart the same origin in the same departure-date/hour bucket. Computed before target filtering. |
+| `dest_hourly_arrivals` | int32 | NYC-origin flights scheduled to arrive at the same destination in the same scheduled-arrival-hour bucket, grouped by departure date. Computed before target filtering; not a total-airport count and does not roll arrivals across midnight. |
+
+These are schedule-based proxies available from the timetable, not realized
+congestion. They are included in the 33-feature validation ablation only; the
+canonical frozen test evaluation uses 31 features without them.
 
 ### Temporal features (`features/temporal.py` — Rashmi)
 | Column | Type | Description |

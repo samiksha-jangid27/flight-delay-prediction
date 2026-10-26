@@ -6,7 +6,12 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_recall_curve, roc_curve
+from sklearn.metrics import (
+    average_precision_score,
+    precision_recall_curve,
+    roc_auc_score,
+    roc_curve,
+)
 
 from .calibration import reliability
 
@@ -20,15 +25,31 @@ def render(frames: dict, output: Path, *, thresholds=None, variants=None) -> Non
         fig.savefig(output / f"{name}.png", dpi=220)
         plt.close(fig)
 
+    partitions = {
+        partition
+        for frame in frames.values()
+        if "partition" in frame
+        for partition in frame.partition.unique()
+    }
+    partition_label = (
+        ", ".join(partition.title() for partition in sorted(partitions))
+        if partitions
+        else "Evaluation"
+    )
+
     for kind in ["roc", "precision_recall"]:
         fig, ax = plt.subplots(figsize=(7, 5))
         for name, frame in frames.items():
             y, p = frame.y_true, frame.y_probability
             if kind == "roc":
                 x, z, _ = roc_curve(y, p)
+                score = roc_auc_score(y, p)
+                metric = "ROC-AUC"
             else:
                 z, x, _ = precision_recall_curve(y, p)
-            ax.plot(x, z, label=name)
+                score = average_precision_score(y, p)
+                metric = "AP"
+            ax.plot(x, z, label=f"{name} ({metric}={score:.3f})")
         if kind == "roc":
             ax.plot([0, 1], [0, 1], "k--", label="Chance")
         else:
@@ -41,7 +62,7 @@ def render(frames: dict, output: Path, *, thresholds=None, variants=None) -> Non
         ax.set(
             xlabel="False positive rate" if kind == "roc" else "Recall",
             ylabel="True positive rate" if kind == "roc" else "Precision",
-            title=kind.replace("_", " ").title(),
+            title=f"{partition_label} {kind.replace('_', ' ')} curve",
         )
         ax.legend()
         save(fig, kind)
@@ -56,7 +77,7 @@ def render(frames: dict, output: Path, *, thresholds=None, variants=None) -> Non
             ax.set(
                 xlabel="Mean predicted probability",
                 ylabel="Observed delay rate",
-                title=f"{name}: reliability (10 equal-width bins)",
+                title=f"{partition_label} {name}: reliability (10 equal-width bins)",
             )
             ax.legend()
             save(fig, f"{name}_reliability")

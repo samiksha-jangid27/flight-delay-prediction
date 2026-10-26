@@ -58,9 +58,10 @@ distance distribution so models aren't dominated by a few transcontinental route
 *Expected effect:* modest; mainly an interaction signal with carrier/hour.
 
 **Boundary note:** route *historical delay rates* are produced by Samiksha's
-leakage-safe historical engine (`features/historical.py`). This module only adds
-**static, outcome-independent** route attributes and deliberately does not duplicate
-that engine.
+prior-date historical engine (`features/historical.py`). That engine excludes
+same-day and future outcomes; exact availability at the prediction timestamp is
+not verified. This module only adds **static, outcome-independent** route
+attributes and deliberately does not duplicate that engine.
 
 ---
 
@@ -74,11 +75,14 @@ columns:
 - **Origin**: EWR **27.9%** > JFK **25.5%** > LGA **24.0%** — only 3 NYC airports, so
   limited variety (flag for the DL embedding phase).
 - **Historical delay-rate features** correlate positively with the target (see EDA §9).
-- **Airport congestion** (`origin_hourly_departures`, `dest_hourly_arrivals`, schedule-derived)
-  represents time-specific scheduled load. On this single-hub/one-year dataset it adds little
-  (weak, slightly negative correlation; low model importance) because the scheduled `hour`
-  already captures most time-of-day congestion — but it satisfies the brief's congestion
-  requirement and should matter more on a larger multi-airport dataset.
+- **Airport congestion proxies** (`origin_hourly_departures`,
+  `dest_hourly_arrivals`) represent scheduled load within the NYC-origin
+  dataset. Destination arrivals are grouped by departure date and scheduled
+  arrival hour, so these are not total-airport counts and do not adjust
+  cross-midnight arrivals to the next date. The two features are tested in a
+  validation-only ablation and are excluded from the canonical 31-feature
+  held-out evaluation. The small measured validation differences do not
+  establish that congestion is unimportant on other datasets.
 
 ---
 
@@ -88,6 +92,6 @@ columns:
    encoding); **drop or hash** very high-cardinality `tailnum` and `flight`.
 2. Use the **cyclic pairs** instead of raw `hour`/`month` for Logistic Regression.
 3. Class imbalance (25.9% positive) → `class_weight="balanced"` (LR) /
-   `scale_pos_weight ≈ 2.86` (XGBoost); evaluate with **PR-AUC**.
+   `scale_pos_weight ≈ 2.86` (XGBoost); evaluate with **Average Precision (AP)**.
 4. Fit all encoders on **train only**, transform validation/test — no fitting on
    held-out data.

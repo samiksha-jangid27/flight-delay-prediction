@@ -26,10 +26,14 @@ HISTORICAL_FEATURES: tuple[str, ...] = (
 CONGESTION_FEATURES: tuple[str, ...] = (
     "origin_hourly_departures", "dest_hourly_arrivals",
 )
+# `full` is the canonical 31-feature model for the frozen evaluation.
+# `full_congestion` (33 features) is used only in a validation-only ablation;
+# it has no held-out test score.
 FEATURE_SETS: dict[str, tuple[str, ...]] = {
     "schedule": SCHEDULE_FEATURES,
     "route": SCHEDULE_FEATURES + ROUTE_FEATURES,
-    "full": (
+    "full": SCHEDULE_FEATURES + ROUTE_FEATURES + HISTORICAL_FEATURES,
+    "full_congestion": (
         SCHEDULE_FEATURES + ROUTE_FEATURES + HISTORICAL_FEATURES + CONGESTION_FEATURES
     ),
 }

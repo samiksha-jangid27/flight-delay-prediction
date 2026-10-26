@@ -66,7 +66,7 @@ The work is delivered in two phases:
 | **Prediction time** | Before scheduled departure |
 | **Excluded signals** | Actual departure time, departure delay, arrival time, air time, arrival delay |
 | **Validation** | Chronological split (no future leaks into the past) |
-| **Primary metrics** | PR-AUC and ROC-AUC, supported by precision and recall |
+| **Primary metrics** | Average Precision (AP) and ROC-AUC, supported by precision and recall |
 
 The target is defined in [`target.py`](src/flight_delay/features/target.py);
 rows with an undefined arrival outcome are dropped rather than imputed.
@@ -114,9 +114,12 @@ split — partitioned by unique calendar date, not by row — is in
 
 ## Feature Engineering
 
-All features are derived strictly from the schedule and from historical
-outcomes on prior calendar dates (**33 model features** in total). Four
-independent engines contribute features, each documented and unit-tested.
+The canonical frozen model uses **31 features** from the schedule and
+prior-date historical aggregates. A separate 33-feature variant adds two
+schedule-derived congestion proxies and is evaluated only on validation.
+Availability of prior-date outcomes at the exact operational prediction time
+has not been verified. Four independent feature engines contribute columns,
+each documented and unit-tested.
 
 ### Temporal features &nbsp;·&nbsp; [`temporal.py`](src/flight_delay/features/temporal.py)
 
@@ -159,17 +162,24 @@ aggregation.
 
 ### Airport congestion features &nbsp;·&nbsp; [`congestion.py`](src/flight_delay/features/congestion.py)
 
-Schedule-derived airport load (known before departure, so no leakage):
+Schedule-derived airport-load proxies, counted over the complete NYC-origin
+timetable before rows with undefined arrival outcomes are dropped:
 
 | Feature | Description |
 |---------|-------------|
-| `origin_hourly_departures` | Flights scheduled to depart the same origin in the same (date, hour) |
-| `dest_hourly_arrivals` | Flights scheduled to arrive at the same destination in the same (date, arrival hour) |
+| `origin_hourly_departures` | NYC-origin flights scheduled to depart the same origin in the same departure-date/hour bucket |
+| `dest_hourly_arrivals` | NYC-origin flights scheduled to arrive at the same destination in the scheduled-arrival-hour bucket, grouped by departure date |
 
-These represent "airport congestion" directly (time-specific scheduled load). On
-this single-hub, one-year dataset their marginal value is small — the scheduled
-hour already captures most time-of-day congestion — but they satisfy the brief's
-congestion requirement and would matter more on a larger multi-airport dataset.
+These are schedule-based congestion proxies, not counts of every operation at
+each airport. Destination arrivals are grouped by the flight's departure date;
+scheduled arrivals crossing midnight are not rolled into the following
+calendar date. They are known from the timetable before departure, but do not
+measure realized congestion.
+
+The canonical frozen model and held-out evaluation use the original 31-feature
+allowlist, without these two columns. The 33-feature congestion variant is
+reported only in the validation ablation; its test performance has not been
+measured.
 
 ### Feature selection &nbsp;·&nbsp; [`selection.py`](src/flight_delay/features/selection.py)
 
@@ -233,34 +243,38 @@ Selected findings:
 
 ## Results Summary
 
-Two classifiers are trained and compared under the frozen chronological
-protocol: a class-balanced Logistic Regression and a tuned XGBoost. Both are
-calibrated on a held-out late-training window (isotonic selected by validation
-Brier), with operating thresholds frozen on validation before the one-time test.
-Full methodology, calibration study, paired uncertainty intervals and a
-proper-score audit are in [evaluation_results.md](docs/evaluation_results.md) and
+The frozen 31-feature evaluation compares class-balanced Logistic Regression
+and tuned XGBoost under a chronological protocol. Both are calibrated on a
+held-out late-training window (isotonic selected by validation Brier), with
+operating thresholds fixed using validation. The test period was also used in
+an earlier pre-congestion evaluation and later reproduced for an audit; it was
+not untouched throughout project development. Full methodology, calibration
+study, paired uncertainty intervals and a proper-score audit are in
+[evaluation_results.md](docs/evaluation_results.md) and
 [evaluation_audit.md](docs/evaluation_audit.md).
 
 **Validation (development set, 50,466 flights, delay prevalence 0.156)**
 
-| Model | Threshold | PR-AUC | ROC-AUC | Precision | Recall | F1 | Brier |
+| Model | Threshold | Average Precision (AP) | ROC-AUC | Precision | Recall | F1 | Brier |
 |-------|----------:|-------:|--------:|----------:|-------:|---:|------:|
-| Balanced Logistic Regression | 0.345 | 0.230 | 0.638 | 0.229 | 0.576 | 0.327 | 0.152 |
-| Tuned XGBoost | 0.257 | 0.212 | 0.626 | 0.216 | 0.596 | 0.317 | 0.137 |
+| Balanced Logistic Regression | 0.344 | 0.223 | 0.636 | 0.224 | 0.605 | 0.327 | 0.151 |
+| Tuned XGBoost | 0.250 | 0.213 | 0.628 | 0.216 | 0.593 | 0.317 | 0.137 |
 
-**Held-out test (one-time frozen evaluation, 48,581 flights, prevalence 0.269)**
+**Held-out test (frozen 31-feature evaluation, 48,581 flights, prevalence 0.269)**
 
-| Model | PR-AUC | ROC-AUC | Precision | Recall | F1 |
+| Model | Average Precision (AP) | ROC-AUC | Precision | Recall | F1 |
 |-------|-------:|--------:|----------:|-------:|---:|
-| Balanced Logistic Regression | 0.296 | 0.545 | 0.300 | 0.465 | 0.364 |
-| Tuned XGBoost | 0.338 | 0.599 | 0.332 | 0.542 | 0.412 |
+| Balanced Logistic Regression | 0.294 | 0.544 | 0.296 | 0.488 | 0.369 |
+| Tuned XGBoost | 0.337 | 0.599 | 0.335 | 0.532 | 0.411 |
 
-XGBoost is the stronger descriptive held-out candidate on PR-AUC, ROC-AUC,
+XGBoost is the stronger descriptive held-out candidate on AP, ROC-AUC,
 precision, recall and F1. Discrimination is modest in absolute terms (ROC-AUC
 ≈ 0.60), and the evaluation audit shows the calibrated probabilities are not
 convincingly better than a prevalence baseline on proper scores. No
 production-readiness claim is made; prevalence differs between validation and
-test, so their metrics are not directly comparable.
+test, so their metrics are not directly comparable. The 33-feature
+congestion-enabled variant has validation-only ablation results and no held-out
+test score; see [congestion_ablation.json](docs/congestion_ablation.json).
 
 ---
 
@@ -331,7 +345,7 @@ flight-delay-prediction/
 │   ├── models/         logistic, xgboost_model
 │   └── evaluation/     metrics, calibration, thresholds, predictions, evaluate,
 │                       rescheduling, baselines, run_state, plots
-└── tests/              Automated test suite (223 tests)
+└── tests/              Automated test suite (224 tests)
 ```
 
 ---
@@ -372,7 +386,9 @@ repository root with the package installed.
 > verified to run on the real `data/raw/flights.csv`: `scripts/compare_models.py`
 > reproduces the documented balanced-LR validation AP of `0.206047` exactly. To
 > check changes, re-run steps 1–3; **do not** re-run the guarded final-test stage
-> just to verify edits — it is intended to run once.
+> just to verify edits. The same calendar test period appeared in an earlier
+> pre-congestion experiment and was reproduced during audit; it was not used for
+> selection in the frozen run, but was not untouched throughout project history.
 
 ```bash
 # 1. Model-to-model comparison on the chronological validation split
@@ -391,14 +407,16 @@ python scripts/rescheduling_analysis.py --eval-dir reports/evaluation \
 #     frozen threshold -> decision, for real validation flights
 python scripts/predict_example.py
 
-# 4. One-time held-out test — only after reviewing reports/evaluation/selection.json
+# 4. Guarded final-test stage — do not rerun just to verify code or documentation
 python -m flight_delay.evaluation.evaluate final-test \
   --data data/raw/flights.csv --output-dir reports/evaluation
 ```
 
 > The final-test stage is guarded by persistent exclusive markers: a started test
-> phase cannot be silently retried. Do **not** rerun the real final test merely to
-> check implementation changes. On macOS, XGBoost needs OpenMP (`brew install
+> phase cannot be silently retried in the same output directory. The tracked
+> [`docs/canonical_evaluation.json`](docs/canonical_evaluation.json) records the
+> canonical frozen 31-feature results; the 33-feature congestion variant has
+> validation results only. On macOS, XGBoost needs OpenMP (`brew install
 > libomp`). The supplementary calibration and audit commands are listed under
 > [Evaluation and supplementary audits](#evaluation-and-supplementary-audits).
 
@@ -417,6 +435,7 @@ python -m flight_delay.evaluation.evaluate final-test \
 | [xgboost_results.md](docs/xgboost_results.md) | Selected hyperparameters and validation results |
 | [model_comparison.md](docs/model_comparison.md) | Logistic Regression vs XGBoost comparison |
 | [evaluation_results.md](docs/evaluation_results.md) | Calibration, thresholds, paired uncertainty, held-out test |
+| [canonical_evaluation.json](docs/canonical_evaluation.json) | Machine-readable frozen 31-feature evaluation and test-history provenance |
 | [evaluation_audit.md](docs/evaluation_audit.md) | Reproduction, proper-score audit and remaining limitations |
 | [rescheduling_analysis.md](docs/rescheduling_analysis.md) | Offline rescheduling what-if, assumptions and sensitivity |
 
@@ -424,19 +443,23 @@ python -m flight_delay.evaluation.evaluate final-test \
 
 ## Reports and Generated Artifacts
 
-All data, model and evaluation artifacts are regenerable and Git-ignored
-(see [`.gitignore`](.gitignore)); only the committed EDA figures and the
-documentation above are tracked.
+Generated data, model and evaluation artifacts are Git-ignored
+(see [`.gitignore`](.gitignore)); curated EDA/paper figures, source, reports and
+documentation are tracked.
 
 | Location | Produced by | Contents |
 |----------|-------------|----------|
 | `reports/figures/*.png` | `notebooks/01_data_exploration.ipynb` | Committed EDA visualizations |
 | `reports/results/` | `scripts/compare_models.py` | Validation model-comparison CSV |
+| `reports/evaluation_v1_noCongestion/` | Preserved evaluation audit snapshot | Historical 100-resample bootstrap; not the source for canonical test metrics |
 | `reports/evaluation/*.csv` | `evaluate validation` / `final-test` | Aligned predictions and operating curves |
-| `reports/evaluation/*.json` | `evaluate` | Metrics, bootstrap, and frozen `selection.json` provenance |
+| `reports/evaluation/*.json` | `evaluate` | Local metrics, bootstrap, and frozen `selection.json` provenance; local bootstrap has 100 resamples, canonical 300-resample intervals are in the tracked manifest; no local `test_metrics.json` |
 | `reports/evaluation/figures/` | `evaluate` | ROC, PR, reliability, confusion and proper-score plots |
 | `reports/evaluation/frozen.joblib` | `evaluate validation` | Frozen bases, calibrators and thresholds |
 | `reports/evaluation/rescheduling/` | `scripts/rescheduling_analysis.py` | What-if JSON reports, cost-ratio sweep, net-benefit curves and figures |
+
+Canonical frozen metrics and the 300-resample validation uncertainty interval
+are in [`docs/canonical_evaluation.json`](docs/canonical_evaluation.json).
 
 The raw dataset is expected at `data/raw/flights.csv` (the Kaggle 2013 US flights
 starter dataset); it is the only tracked file under `data/`.

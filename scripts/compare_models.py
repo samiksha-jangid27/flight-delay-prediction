@@ -101,7 +101,7 @@ def run_model_comparison(
     *, n_jobs: int = 4,
 ) -> pd.DataFrame:
     """Build the input dataset once so all candidates use identical flight rows."""
-    train, validation, _test_untouched = build_data_pipeline(data_path)
+    train, validation, _test_split = build_data_pipeline(data_path)
     results = compare_model_candidates(train, validation, n_jobs=n_jobs)
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)

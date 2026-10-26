@@ -1,16 +1,20 @@
 # Evaluation audit — AML Phase 1
 
-> **⚠️ Superseded run.** This audit records the original frozen evaluation of
-> 22 October 2026, **before** the airport-congestion features were added. The
-> **current canonical results** (33-feature model) are in
-> [`paper/main.pdf`](../paper/main.pdf) and the [README](../README.md); they
-> differ only marginally (e.g. test PR-AUC 0.337 → 0.338) and the conclusions
-> hold. Numbers below are the dated log for the original feature set.
+> **Frozen 31-feature evaluation audit.** The held-out metrics below are for
+> the canonical model without the two later congestion features. Those features
+> were assessed in a separate validation-only ablation; they have no held-out
+> test score. Do not interpret the ablation as a replacement test evaluation.
 
 Executed 22 October 2026 on `fix/lakshya-evaluation-audit`, based on reviewed merge
 `5be554cefb335de8030cc12c09bbb343eea7a527`. The branch adds verification and
 supplementary analysis. Original classifier implementations, hyperparameters,
 calibration maps, chronological boundaries and published selections are preserved.
+
+This is a dated audit snapshot: test counts and local-file statements below
+describe that audit run, not the current checkout. The tracked
+[`canonical_evaluation.json`](canonical_evaluation.json) is the current
+machine-readable frozen-results reference; run the current full test suite for
+the latest repository test count.
 
 ## Reproducibility and original-run preservation
 
@@ -152,9 +156,11 @@ Neither alternative was substituted or tuned against the final test. See
   intervals include zero.
 - Class imbalance, seasonal drift, one historical dataset, uncertain feature
   availability and unspecified false-alarm costs limit deployment conclusions.
-- Mutable files cannot prove which labels a historical run consulted or prove
-  that an earlier test run happened exactly once. Verified validation-only replay
-  is reported separately from that unverified history.
+- Mutable files cannot prove the full historical access sequence. The audit
+  reapplied the test only to reproduce fixed results without changing model
+  decisions; the same period was also used in an earlier pre-congestion
+  experiment. Therefore, do not claim that the period was globally untouched or
+  evaluated only once across project development.
 
 ## Checks and CI
 
