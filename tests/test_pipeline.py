@@ -39,6 +39,8 @@ def test_pipeline_includes_engineered_features():
         "distance_band",
         "is_long_haul",
         "distance_log",
+        "origin_hourly_departures",
+        "dest_hourly_arrivals",
     }
 
     for split in (train, validation, test):

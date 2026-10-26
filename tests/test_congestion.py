@@ -81,6 +81,21 @@ def test_pipeline_congestion_counts_include_undefined_outcome_flights(monkeypatc
 
     train, _, _ = data_pipeline.build_data_pipeline("unused.csv")
 
+    # Both congestion columns must survive the full pipeline.
+    assert {"origin_hourly_departures", "dest_hourly_arrivals"} <= set(train.columns)
+
     # Both surviving EWR/hour-8 flights must still see all 3 scheduled departures.
     assert len(train) == 2
     assert (train["origin_hourly_departures"] == 3).all()
+
+    # dest_hourly_arrivals must likewise count the dropped-outcome flight. The
+    # surviving ORD arrival (row 0) shared its (date, arrival-hour) slot with the
+    # cancelled ORD flight (row 1, missing arr_delay), so its count must stay 2,
+    # not fall to 1 once the undefined-outcome row is removed.
+    ord_rows = train[train["dest"] == "ORD"]
+    assert len(ord_rows) == 1
+    assert (ord_rows["dest_hourly_arrivals"] == 2).all()
+    # The lone MIA arrival had no slot-mate and must read 1.
+    mia_rows = train[train["dest"] == "MIA"]
+    assert len(mia_rows) == 1
+    assert (mia_rows["dest_hourly_arrivals"] == 1).all()
