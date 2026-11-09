@@ -12,6 +12,9 @@ dependencies = [
   "matplotlib", "seaborn", "jupyter", "pytest", "pyyaml",
 ]
 
+[project.optional-dependencies]
+dl = ["torch"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
