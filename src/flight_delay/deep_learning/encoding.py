@@ -6,6 +6,7 @@ arrays and statistics instead of fitting a second preprocessing pipeline.
 
 Dense input layout:
     [26 numeric features, route one-hot columns, distance_band one-hot columns]
+    Unseen route and distance-band IDs produce all-zero blocks.
 
 Categorical input layout (required by FlightDelayMLP):
     [carrier, origin, dest]
@@ -25,6 +26,7 @@ import torch
 from torch import Tensor
 
 from flight_delay.deep_learning.dataset import DLDataset, DLPartition
+from flight_delay.deep_learning.embeddings import UNKNOWN_CATEGORY_INDEX
 
 EMBEDDING_FIELDS: Final[tuple[str, ...]] = ("carrier", "origin", "dest")
 DENSE_CATEGORICAL_FIELDS: Final[tuple[str, ...]] = ("route", "distance_band")
@@ -204,13 +206,14 @@ class DLTensorEncoder:
         ).astype(np.int64, copy=False)
 
         dense_parts = [numeric]
-        row_indices = np.arange(row_count)
         for field in DENSE_CATEGORICAL_FIELDS:
             ids = categorical[:, self.categorical_positions[field]]
             one_hot = np.zeros(
                 (row_count, self.embedding_sizes[field]), dtype=np.float32
             )
-            one_hot[row_indices, ids] = 1.0
+            # Unseen IDs have no training examples for their one-hot column.
+            active_rows = np.flatnonzero(ids != UNKNOWN_CATEGORY_INDEX)
+            one_hot[active_rows, ids[active_rows]] = 1.0
             dense_parts.append(one_hot)
 
         x_dense_array = np.ascontiguousarray(
