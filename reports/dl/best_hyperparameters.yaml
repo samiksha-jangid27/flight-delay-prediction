@@ -1,0 +1,11 @@
+batch_size: 1024
+best_epoch: 1
+dropout: 0.3
+hidden_dims:
+- 128
+- 64
+learning_rate: 0.001
+optimizer: adamw
+seed: 46
+validation_average_precision: 0.2065833894139669
+weight_decay: 0.0001

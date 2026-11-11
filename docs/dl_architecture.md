@@ -71,14 +71,30 @@ Save the fitted vocabulary, numeric preprocessing statistics, feature order,
 and model settings alongside the model state so a checkpoint can be
 reconstructed with the same input order and table sizes.
 
+## Reproducible training and exports
+
+Install the optional dependency with `python -m pip install -e ".[dl]"`, then
+run from the repository root with
+`python -m flight_delay.deep_learning.train --config configs/dl_config.yaml`.
+The trainer uses early-training rows for gradient updates and validation Average
+Precision for early stopping and hyperparameter selection. It does not transform
+or score the held-out test partition. The late `train_calibration` partition is
+scored only after the best checkpoint has been reloaded.
+
+The configured output directory (`reports/dl/`) receives `best_model.pt`,
+`best_hyperparameters.yaml`, `tuning_results.csv`,
+`train_calibration_predictions.csv`, `validation_predictions.csv`, and run
+metadata. Prediction CSVs use the project schema:
+`flight_id, flight_date, y_true, y_probability, partition`.
+
 ## Verification
 
 ```bash
 python -m pip install -e ".[dl]"
-python -m pytest -q tests/test_dl_dataset.py tests/test_dl_encoding.py tests/test_dl_mlp.py
+python -m pytest -q tests/test_dl_dataset.py tests/test_dl_encoding.py tests/test_dl_mlp.py tests/test_dl_training.py
 ```
 
-The MLP tests require the optional `dl` extra and skip without PyTorch.
+The MLP and training tests require the optional `dl` extra and skip without PyTorch.
 The tests cover single-flight and multi-flight batches, missing and unseen IDs,
 invalid inputs, gradients into each embedding table, and learning a synthetic
 interaction that depends on both the carrier and a dense input. A one-hot MLP
