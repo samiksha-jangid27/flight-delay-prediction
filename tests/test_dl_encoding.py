@@ -107,14 +107,22 @@ def test_transform_returns_mlp_compatible_shapes_dtypes_and_order() -> None:
     assert batch.x_cat.tolist() == [[2, 2, 3], [3, 1, 1], [2, 3, 2]]
 
 
-def test_one_hot_encodes_known_missing_and_unseen_values() -> None:
+def test_one_hot_encodes_known_and_missing_values_and_zeroes_unseen_values() -> None:
     partition = _partition()
+    # Give the third flight unseen IDs for both route and distance_band.
+    partition.categorical[2, [0, 3]] = 1
     batch = DLTensorEncoder(_dataset(partition)).transform(partition)
     # route occupies dense columns 2:6; distance_band occupies 6:10.
-    assert batch.x_dense[0, 2:6].tolist() == [0.0, 0.0, 1.0, 0.0]
-    assert batch.x_dense[1, 2:6].tolist() == [1.0, 0.0, 0.0, 0.0]
-    assert batch.x_dense[1, 6:10].tolist() == [1.0, 0.0, 0.0, 0.0]
-    assert batch.x_dense[0, 6:10].tolist() == [0.0, 0.0, 0.0, 1.0]
+    assert batch.x_dense[:, 2:6].tolist() == [
+        [0.0, 0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ]
+    assert batch.x_dense[:, 6:10].tolist() == [
+        [0.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ]
 
 
 def test_transform_partition_uses_fitted_dataset_partition() -> None:
