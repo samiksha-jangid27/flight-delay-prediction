@@ -650,6 +650,62 @@ reversal. Third, even the best attainable efficiency is modest (about $64\%$ of 
 perfect-foresight oracle at the cheapest ratio), bounding what any policy built on
 the current probabilities can deliver.
 
+\section{Deep Learning Extension (Phase 2)}
+\label{sec:deeplearning}
+Phase 2 adds a compact neural model to test whether learned representations of
+airline and airport identity capture interactions that the engineered tabular
+features miss. It reuses the identical target, chronological partitions, and
+pre-departure feature allowlist as the Phase 1 pipeline; the held-out test
+partition is never used for training, early stopping, or model selection.
+
+\subsection{Architecture}
+The model is an embedding multilayer perceptron. Carrier, origin, and destination
+are mapped to trainable entity embeddings~\cite{entityembed}; the remaining
+standardised numeric features and the route/distance one-hot blocks are
+concatenated with the embeddings and passed through dense layers with ReLU
+activations and dropout, producing a single delay logit per flight. Reserved
+indices for missing ($0$) and unseen ($1$) categories let the model score
+airports and carriers absent from the training period without errors.
+
+\subsection{Training and reproducibility}
+The network is trained with \code{BCEWithLogitsLoss} and the AdamW optimiser.
+Early stopping monitors validation Average Precision (AP) with a fixed patience,
+and the best checkpoint is restored. Python, NumPy, and PyTorch seeds are fixed
+and deterministic algorithms requested, so a repeated run reproduces the exported
+probabilities bit-for-bit. Hyperparameters are tuned by a seed-controlled search
+over learning rate, batch size, hidden widths, dropout, and weight decay, selected
+on validation AP alone.
+
+\subsection{Regularisation and ablation}
+A one-factor-at-a-time ablation around the baseline configuration (full table in
+the supplementary \code{docs/dl\_ablation.md}) shows the model sits in a mild
+over-fitting regime: the strongest dropout ($0.3$) gives the best validation AP,
+while shrinking the network and increasing weight decay also help, and a smaller
+batch is the only change that hurts. Validation AP peaks after a single epoch in
+five of six configurations, indicating the engineered features carry most of
+their signal immediately and leave little for additional epochs to extract.
+
+\subsection{Hybrid approach}
+We additionally implement a leakage-safe stacked ensemble: a logistic
+meta-learner over the frozen XGBoost and MLP probabilities, fitted only on the
+calibration partition and evaluated on validation. The stack does \emph{not}
+improve ranking over the best single model. An error-diversity analysis explains
+why: the XGBoost and MLP residuals are $0.968$-correlated, so the models are
+wrong on almost the same flights and no ensemble can recover orthogonal signal.
+This is consistent with the tabular-learning literature, in which gradient-boosted
+trees match or beat neural models on feature-engineered
+problems~\cite{grinsztajn,shwartzziv}. We report this transparently as a
+negative result and identify representation-level fusion (gradient-boosted leaf
+features as additional embeddings~\cite{fbgbdt}) as the justified next step.
+
+\subsection{Fair comparison protocol}
+The embedding MLP exports probabilities on the same calibration and validation
+rows, with identical flight identifiers, dates, and labels, in the project
+prediction schema. The full AML-versus-DL comparison---PR-AUC, ROC-AUC, recall at
+a selected operational precision, confusion matrices, and reliability
+diagrams---follows the frozen Phase 1 evaluation protocol and is reported with
+the DL evaluation artifacts.
+
 \section{Discussion and Limitations}
 \label{sec:discussion}
 The results are deliberately unembellished. Discrimination is modest
@@ -711,6 +767,10 @@ re-run or re-selected.
 \bibitem{claude} Anthropic, Claude. Available: \url{https://claude.ai/}.
 \bibitem{bts} U.S. Bureau of Transportation Statistics, ``Airline On-Time Performance Data,'' TranStats database. [Online]. Available: \url{https://www.transtats.bts.gov/}.
 \bibitem{guo} C. Guo, G. Pleiss, Y. Sun, and K. Q. Weinberger, ``On Calibration of Modern Neural Networks,'' in \emph{Proceedings of the 34th International Conference on Machine Learning (ICML)}, 2017, pp. 1321--1330.
+\bibitem{entityembed} C. Guo and F. Berkhahn, ``Entity Embeddings of Categorical Variables,'' \emph{arXiv preprint arXiv:1604.06737}, 2016.
+\bibitem{grinsztajn} L. Grinsztajn, E. Oyallon, and G. Varoquaux, ``Why do tree-based models still outperform deep learning on tabular data?,'' \emph{arXiv preprint arXiv:2207.08815}, 2022.
+\bibitem{shwartzziv} R. Shwartz-Ziv and A. Armon, ``Tabular Data: Deep Learning is Not All You Need,'' \emph{arXiv preprint arXiv:2106.03253}, 2021.
+\bibitem{fbgbdt} X. He et al., ``Practical Lessons from Predicting Clicks on Ads at Facebook,'' in \emph{Proceedings of the 8th International Workshop on Data Mining for Online Advertising (ADKDD)}, 2014, pp. 1--9.
 \end{thebibliography}
 
 \end{document}

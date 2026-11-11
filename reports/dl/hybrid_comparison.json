@@ -1,0 +1,30 @@
+{
+  "xgboost_raw": {
+    "average_precision": 0.21121071061073393,
+    "roc_auc": 0.6277638573889743,
+    "brier": 0.3059228830941521,
+    "log_loss": 0.8600103836908174
+  },
+  "mlp_raw": {
+    "average_precision": 0.2065833894139669,
+    "roc_auc": 0.6205716917224291,
+    "brier": 0.20852382017824547,
+    "log_loss": 0.5975563327689025
+  },
+  "hybrid": {
+    "average_precision": 0.209296460072176,
+    "roc_auc": 0.6255159957488036,
+    "brier": 0.13714529240188053,
+    "log_loss": 0.4411378116981729
+  },
+  "meta_learner_coefficients": {
+    "xgb": 3.490936347599977,
+    "mlp": -0.8696753003062804,
+    "intercept": -2.869348895054027
+  },
+  "error_diversity": {
+    "probability_pearson": 0.9071395552693508,
+    "probability_spearman": 0.905213745324207,
+    "residual_pearson": 0.9684201925870336
+  }
+}
