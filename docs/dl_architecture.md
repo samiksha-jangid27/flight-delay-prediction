@@ -16,18 +16,46 @@ between scheduled departure time and delay risk varies by destination.
 
 Use the train-fitted encodings from the [DL data contract](dl_data_contract.md).
 The dataset adapter returns 26 numeric features and five categorical columns.
-Select the three embedded columns by name using `EMBEDDING_FIELDS`. For a
-comparison using all 31 source features, one-hot encode the remaining
-`route` and `distance_band` columns using the training vocabularies and
-append them to `x_dense`. The encoder supplies the resulting `dense_dim`.
-Keep metadata and labels in the same row order as both inputs.
+`DLTensorEncoder` puts the three embedded fields in `x_cat` and appends
+one-hot blocks for `route` and `distance_band` to `x_dense`. ID 0 activates
+the missing-value column. ID 1 produces an all-zero block so an unseen
+value cannot activate a column with untrained weights. The encoder supplies
+`dense_dim` and returns labels and metadata aligned with both input tensors.
 
-Pass the encoder's three `nn.Embedding` tables as `carrier_embedding`,
-`origin_embedding` and `dest_embedding`. Size each table from the dataset's
-`embedding_sizes` so that it has rows for ID 0 (missing) and ID 1 (unseen).
-The model looks up those IDs as supplied and registers the tables as part of
-its parameters and checkpoint. The encoder owns the vocabulary and how the
-reserved embedding rows are initialized or masked.
+`build_embedding_tables` creates the three tables from the encoder's
+train-fitted sizes. By default, the embedding for unseen ID 1 is a frozen
+zero vector. The missing ID 0 remains trainable. The MLP registers all
+three tables as part of its parameters and checkpoint.
+
+## Run a batch through the MLP
+
+Run this example from the repository root after installing the optional `dl`
+dependencies. It passes 64 training flights through a newly initialized model.
+
+```python
+import torch
+
+from flight_delay.deep_learning.dataset import build_dl_dataset
+from flight_delay.deep_learning.embeddings import build_embedding_tables
+from flight_delay.deep_learning.encoding import DLTensorEncoder
+from flight_delay.deep_learning.mlp import FlightDelayMLP
+
+dataset = build_dl_dataset("data/raw/flights.csv")
+encoder = DLTensorEncoder(dataset)
+tables = build_embedding_tables(encoder.embedding_sizes)
+model = FlightDelayMLP(
+    encoder.dense_dim,
+    carrier_embedding=tables["carrier"],
+    origin_embedding=tables["origin"],
+    dest_embedding=tables["dest"],
+)
+
+batch = encoder.transform_partition("train")
+model.eval()
+with torch.inference_mode():
+    logits = model(batch.x_dense[:64], batch.x_cat[:64])
+print(logits.shape)  # torch.Size([64])
+```
 
 ## Network and training handoff
 
@@ -39,14 +67,15 @@ The embedding widths come from the supplied tables.
 
 Train with `BCEWithLogitsLoss` and float labels shaped `(batch,)`. Use
 `model.eval()` and apply sigmoid to the logits when exporting probabilities.
-Save the fitted encoder and model settings alongside the model state so a
-checkpoint can be reconstructed with the same input order and table sizes.
+Save the fitted vocabulary, numeric preprocessing statistics, feature order,
+and model settings alongside the model state so a checkpoint can be
+reconstructed with the same input order and table sizes.
 
 ## Verification
 
 ```bash
 python -m pip install -e ".[dl]"
-python -m pytest -q tests/test_dl_mlp.py
+python -m pytest -q tests/test_dl_dataset.py tests/test_dl_encoding.py tests/test_dl_mlp.py
 ```
 
 The MLP tests require the optional `dl` extra and skip without PyTorch.
