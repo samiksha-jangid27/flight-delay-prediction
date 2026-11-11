@@ -1,0 +1,53 @@
+data_path: data/raw/flights.csv
+device: cpu
+output_dir: reports/dl
+search:
+  trials:
+  - batch_size: 1024
+    dropout: 0.1
+    hidden_dims:
+    - 128
+    - 64
+    learning_rate: 0.001
+    weight_decay: 0.0001
+  - batch_size: 1024
+    dropout: 0.1
+    hidden_dims:
+    - 128
+    - 64
+    learning_rate: 0.0005
+    weight_decay: 0.0001
+  - batch_size: 512
+    dropout: 0.1
+    hidden_dims:
+    - 128
+    - 64
+    learning_rate: 0.001
+    weight_decay: 0.0001
+  - batch_size: 1024
+    dropout: 0.1
+    hidden_dims:
+    - 64
+    - 32
+    learning_rate: 0.001
+    weight_decay: 0.0001
+  - batch_size: 1024
+    dropout: 0.3
+    hidden_dims:
+    - 128
+    - 64
+    learning_rate: 0.001
+    weight_decay: 0.0001
+  - batch_size: 1024
+    dropout: 0.1
+    hidden_dims:
+    - 128
+    - 64
+    learning_rate: 0.001
+    weight_decay: 0.001
+seed: 42
+training:
+  epochs: 20
+  min_delta: 0.0001
+  optimizer: adamw
+  patience: 4

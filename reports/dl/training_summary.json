@@ -1,0 +1,22 @@
+{
+  "seed": 42,
+  "selection_metric": "validation average precision",
+  "test_partition_used_for_selection": false,
+  "best_hyperparameters": {
+    "learning_rate": 0.001,
+    "batch_size": 1024,
+    "hidden_dims": [
+      128,
+      64
+    ],
+    "dropout": 0.3,
+    "weight_decay": 0.0001,
+    "optimizer": "adamw",
+    "seed": 46,
+    "best_epoch": 1,
+    "validation_average_precision": 0.2065833894139669
+  },
+  "checkpoint": "/Users/rashmianand/Desktop/Projects/DL PROJECT/flight-delay-prediction/reports/dl/best_model.pt",
+  "validation_predictions": "/Users/rashmianand/Desktop/Projects/DL PROJECT/flight-delay-prediction/reports/dl/validation_predictions.csv",
+  "train_calibration_predictions": "/Users/rashmianand/Desktop/Projects/DL PROJECT/flight-delay-prediction/reports/dl/train_calibration_predictions.csv"
+}
