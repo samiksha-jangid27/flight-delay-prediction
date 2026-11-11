@@ -10,10 +10,10 @@ prior-date history subject to the availability assumptions documented below.
 
 Team ID `T022` &nbsp;·&nbsp; Section `C`
 
-<!-- ![Status](https://img.shields.io/badge/phase-Advanced%20ML%20complete-success)
-![Tests](https://img.shields.io/badge/tests-218%20passing-success) -->
-<!-- ![Python](https://img.shields.io/badge/python-3.11%2B-informational) -->
-<!-- ![Protocol](https://img.shields.io/badge/history-prior%20dates%3B%20availability%20unverified-yellow) -->
+![Phase 1](https://img.shields.io/badge/Advanced%20ML-complete-success)
+![Phase 2](https://img.shields.io/badge/Deep%20Learning-models%20complete-blue)
+![Tests](https://img.shields.io/badge/tests-284%20passing-success)
+![Python](https://img.shields.io/badge/python-3.11%2B-informational)
 
 </div>
 
@@ -28,6 +28,7 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 - [Feature Engineering](#feature-engineering)
 - [Exploratory Data Analysis](#exploratory-data-analysis)
 - [Results Summary](#results-summary)
+- [Deep Learning Extension (Phase 2)](#deep-learning-extension-phase-2)
 - [Rescheduling What-If Analysis](#rescheduling-what-if-analysis)
 - [Repository Structure](#repository-structure)
 - [Getting Started](#getting-started)
@@ -36,7 +37,8 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 - [Reports and Generated Artifacts](#reports-and-generated-artifacts)
 - [Testing](#testing)
 - [Team](#team)
-- [Roadmap](#roadmap)
+- [Dataset](#dataset)
+- [Evaluation and supplementary audits](#evaluation-and-supplementary-audits)
 
 ---
 
@@ -54,7 +56,7 @@ The work is delivered in two phases:
 | Phase | Focus | State |
 |-------|-------|-------|
 | **Advanced ML** | Leakage-safe data pipeline, feature engineering, classical classifiers, calibrated evaluation and offline rescheduling what-if | Complete |
-| **Deep Learning** | Learned entity embeddings and temporal modelling, benchmarked against the Advanced ML baseline | In Planning |
+| **Deep Learning** | Embedding MLP (learned airline/airport embeddings) reusing the same partitions and pre-departure contract, plus a leakage-safe ML+DL hybrid and a DL ablation study | Models complete; AML-vs-DL comparison in progress |
 
 ---
 
@@ -315,6 +317,85 @@ test score; see [congestion_ablation.json](docs/congestion_ablation.json).
 
 ---
 
+## Deep Learning Extension (Phase 2)
+
+Phase 2 adds a compact neural model to test the project's core hypothesis — that
+**learned embeddings for airline, origin and destination** can capture
+interactions that the hand-engineered route/congestion features miss. It reuses
+the **identical** target, chronological partitions (327,346 observations), and
+pre-departure feature contract as Phase 1. The held-out **test partition is never
+used** for training, early stopping, tuning, or model selection.
+
+### Pipeline
+
+```mermaid
+flowchart LR
+    A[DL dataset adapter<br/>dataset.py] --> B[Train-fitted encoding<br/>encoding.py]
+    B --> C[Entity embeddings<br/>embeddings.py]
+    C --> D[Embedding MLP<br/>mlp.py]
+    D --> E[Training + tuning<br/>early stop on val AP<br/>train.py]
+    E --> F[Predictions in<br/>project CSV schema]
+    F --> G[Hybrid stack<br/>XGBoost + MLP<br/>hybrid.py]
+    F --> H[AML vs DL comparison<br/>Priority 5 — in progress]
+
+    style A fill:#e8f0fe,stroke:#4285f4
+    style D fill:#e8f0fe,stroke:#4285f4
+    style E fill:#e8f0fe,stroke:#4285f4
+    style G fill:#fef7e0,stroke:#f9ab00
+    style H fill:#f1f3f4,stroke:#9aa0a6
+```
+
+### Components
+
+| Component | What it does | Code | Docs |
+|-----------|--------------|------|------|
+| **Dataset adapter** | Reuses `build_data_pipeline()`; emits reproducible train / calibration / validation / test tensors from the 31-feature allowlist, preserving flight IDs, dates and labels; audits post-departure/future-outcome exclusion. | [`dataset.py`](src/flight_delay/deep_learning/dataset.py) | [dl_data_contract.md](docs/dl_data_contract.md) |
+| **Encoding & embeddings** | Train-fitted vocabularies for carrier/origin/dest with reserved missing (`0`) and unseen (`1`) indices; train-fitted numeric imputation/scaling; row-aligned integer + dense tensors; three `nn.Embedding` tables. | [`encoding.py`](src/flight_delay/deep_learning/encoding.py), [`embeddings.py`](src/flight_delay/deep_learning/embeddings.py) | [dl_architecture.md](docs/dl_architecture.md) |
+| **Embedding MLP** | Concatenates the three embeddings with the dense block; configurable dense layers, ReLU and dropout; one delay logit per flight; architecture independent of the training loop. | [`mlp.py`](src/flight_delay/deep_learning/mlp.py) | [dl_architecture.md](docs/dl_architecture.md) |
+| **Training & tuning** | PyTorch train/val loops, `BCEWithLogitsLoss` + AdamW, early stopping on validation Average Precision, seed-controlled reproducibility, best-checkpoint + hyperparameter export, predictions in the project CSV schema. | [`train.py`](src/flight_delay/deep_learning/train.py), [`dl_config.yaml`](configs/dl_config.yaml) | [dl_ablation.md](docs/dl_ablation.md) |
+| **Hybrid (ML+DL)** | Leakage-safe logistic stack over frozen XGBoost + MLP probabilities, fitted on calibration, evaluated on validation. | [`hybrid.py`](src/flight_delay/deep_learning/hybrid.py), [`build_hybrid.py`](scripts/build_hybrid.py) | [hybrid_approach.md](docs/hybrid_approach.md) |
+
+### Single-model results (validation, same rows/protocol as Phase 1)
+
+| Model | Average Precision | ROC-AUC | Brier |
+|-------|------------------:|--------:|------:|
+| Embedding MLP (raw) | 0.207 | 0.621 | 0.209 |
+| Tuned XGBoost (raw, early-train) | 0.211 | 0.628 | 0.306 |
+| Hybrid: XGBoost + MLP | 0.209 | 0.626 | 0.137 |
+
+The MLP trains reproducibly (repeat runs reproduce probabilities bit-for-bit) and
+its best checkpoint reloads to identical predictions. On this dataset the
+embeddings **match but do not beat** gradient boosting — consistent with the
+tabular-learning literature ([dl_literature_review.md](docs/dl_literature_review.md)).
+
+### Hybrid approach (additional-marks track) — honest result
+
+The stacked hybrid is correctly implemented and leakage-safe, but **does not
+improve ranking** over the best single model. An error-diversity analysis
+explains why: XGBoost and MLP **residuals are 0.968-correlated**, so the models
+err on almost the same flights and no ensemble can recover orthogonal signal.
+This is reported transparently as a negative result, with representation-level
+fusion (gradient-boosted leaf features → MLP embeddings) identified as the
+justified next step. See [hybrid_approach.md](docs/hybrid_approach.md).
+
+### Regularization & ablation
+
+A one-factor-at-a-time ablation (dropout, weight decay, width, learning rate,
+batch size) shows the model sits in a mild-overfitting regime where stronger
+dropout (0.3) generalizes best and validation AP peaks after a single epoch. See
+[dl_ablation.md](docs/dl_ablation.md).
+
+### Status
+
+Model building (dataset, encoding/embeddings, MLP, training) is **complete and
+merged**. The formal **AML-vs-DL evaluation and comparison** — PR/ROC curves,
+reliability diagrams, confusion matrices, recall at a selected precision, and the
+three-model table (`scripts/compare_aml_dl.py`, `reports/dl/figures/`) — is the
+Priority-5 deliverable and is **in progress**. A temporal (LSTM/GRU) model is
+explicitly optional and not implemented.
+
+---
+
 ## Rescheduling What-If Analysis
 
 The second half of the project's expected deliverable: an **offline, assumption-
@@ -367,26 +448,29 @@ this is not a meaningful reversal.
 
 ```text
 flight-delay-prediction/
-├── configs/            Pipeline and model configuration (config.yaml)
+├── configs/            Pipeline/model config (config.yaml) and DL config (dl_config.yaml)
 ├── data/
 │   ├── raw/            Source dataset (flights.csv)
 │   ├── interim/        Intermediate artifacts (ignored)
 │   └── processed/      Model-ready datasets (ignored)
-├── docs/               Data contract, dictionaries, feature/eval/rescheduling reports
+├── docs/               Data contract, dictionaries, feature/eval/rescheduling + DL reports
 ├── models/             Saved model artifacts (ignored)
 ├── notebooks/          EDA, logistic regression, XGBoost, evaluation
+├── paper/              IEEE-format LaTeX report (main.tex) and figures
 ├── reports/
 │   ├── figures/        EDA visualizations
 │   ├── results/        Model comparison outputs (ignored)
+│   ├── dl/             DL checkpoint, predictions, tuning + hybrid artifacts
 │   └── evaluation/     Calibrated predictions, metrics, rescheduling (ignored, regenerable)
-├── scripts/            compare_models, audit, calibration, rescheduling_analysis CLIs
+├── scripts/            compare_models, audit, calibration, rescheduling_analysis, build_hybrid CLIs
 ├── src/flight_delay/
 │   ├── data/           load, target, split, pipeline, audit, prepare
 │   ├── features/       temporal, route, historical, selection, target, model_features
 │   ├── models/         logistic, xgboost_model
+│   ├── deep_learning/  dataset, encoding, embeddings, mlp, train, hybrid
 │   └── evaluation/     metrics, calibration, thresholds, predictions, evaluate,
 │                       rescheduling, baselines, run_state, plots
-└── tests/              Automated test suite (224 tests)
+└── tests/              Automated test suite (284 tests; 60 cover the DL extension)
 ```
 
 ---
@@ -402,6 +486,9 @@ source .venv/bin/activate
 
 # Install the package in editable mode with all dependencies
 pip install -e .
+
+# For the Phase 2 deep-learning work, also install the optional PyTorch extra
+pip install -e ".[dl]"
 ```
 
 Build the chronological datasets:
@@ -461,6 +548,24 @@ python -m flight_delay.evaluation.evaluate final-test \
 > libomp`). The supplementary calibration and audit commands are listed under
 > [Evaluation and supplementary audits](#evaluation-and-supplementary-audits).
 
+### Deep Learning (Phase 2)
+
+Requires the optional PyTorch extra (`pip install -e ".[dl]"`).
+
+```bash
+# 1. Train, tune and export the embedding MLP (writes reports/dl/:
+#    best_model.pt, best_hyperparameters.yaml, tuning_results.csv,
+#    train_calibration_predictions.csv, validation_predictions.csv)
+python -m flight_delay.deep_learning.train --config configs/dl_config.yaml
+
+# 2. Build the leakage-safe XGBoost + MLP hybrid and the comparison summary
+#    (writes reports/dl/hybrid_validation_predictions.csv, hybrid_comparison.json)
+python scripts/build_hybrid.py
+```
+
+Both steps keep the held-out test partition untouched; tuning and hybrid fitting
+use only the training-calibration and validation partitions.
+
 ---
 
 ## Documentation Index
@@ -479,6 +584,11 @@ python -m flight_delay.evaluation.evaluate final-test \
 | [canonical_evaluation.json](docs/canonical_evaluation.json) | Machine-readable frozen 31-feature evaluation and test-history provenance |
 | [evaluation_audit.md](docs/evaluation_audit.md) | Reproduction, proper-score audit and remaining limitations |
 | [rescheduling_analysis.md](docs/rescheduling_analysis.md) | Offline rescheduling what-if, assumptions and sensitivity |
+| [dl_data_contract.md](docs/dl_data_contract.md) | DL dataset adapter, partition provenance and leakage audit |
+| [dl_architecture.md](docs/dl_architecture.md) | Embedding MLP architecture, tensor interface and training interface |
+| [dl_ablation.md](docs/dl_ablation.md) | DL hyperparameter/regularization ablation study |
+| [hybrid_approach.md](docs/hybrid_approach.md) | Leakage-safe ML+DL stacked hybrid, error-diversity analysis and verdict |
+| [dl_literature_review.md](docs/dl_literature_review.md) | Deep-learning literature review grounded in the project's findings |
 
 ---
 
@@ -511,14 +621,26 @@ starter dataset); it is the only tracked file under `data/`.
 
 The suite covers data loading, target construction, the chronological split,
 every feature engine, and the feature-selection guard, with particular
-attention to leakage prevention in the historical features.
+attention to leakage prevention in the historical features. The **60
+deep-learning tests** add the dataset adapter contract, encoding/embedding
+behaviour, MLP forward/backward passes, training reproducibility and early
+stopping, and the hybrid's leakage/alignment guards.
 
 ```bash
 pytest
 ```
 
-The full local suite includes seven tests that read `data/raw/flights.csv`.
-CI uses Python 3.12 and runs synthetic fixtures only:
+The deep-learning tests require the optional PyTorch extra and skip cleanly
+without it:
+
+```bash
+pip install -e ".[dl]"
+pytest tests/test_dl_dataset.py tests/test_dl_encoding.py tests/test_dl_mlp.py \
+       tests/test_dl_training.py tests/test_hybrid.py
+```
+
+CI (Python 3.12) runs the synthetic fixtures in one job and installs CPU PyTorch
+for the deep-learning job:
 
 ```bash
 python -m pytest -q --ignore=tests/test_load.py --ignore=tests/test_pipeline.py --ignore=tests/test_prepare.py
@@ -532,13 +654,13 @@ versions and remaining limitations.
 
 ## Team
 
-| Member | Role |
-|--------|------|
-| Samiksha Jangid (2401010410) | Team Lead — Data Pipeline and Leakage Prevention |
-| Rashmi Anand (2401010374)| Exploratory Data Analysis and Feature Engineering |
-| Ankit Raj Singh (2401010075)| Logistic Regression |
-| Shubhaang Kataruka (2401010450) | XGBoost and Hyperparameter Tuning |
-| Lakshya (2401020036)| Evaluation and Calibration |
+| Member | Phase 1 — Advanced ML | Phase 2 — Deep Learning |
+|--------|------------------------|--------------------------|
+| Samiksha Jangid (2401010410) | Team Lead — Data Pipeline and Leakage Prevention | Neural network architecture (embedding MLP) |
+| Rashmi Anand (2401010374) | Exploratory Data Analysis and Feature Engineering | Training, tuning, reproducibility and prediction exports |
+| Ankit Raj Singh (2401010075) | Logistic Regression | Categorical encoding and embeddings |
+| Shubhaang Kataruka (2401010450) | XGBoost and Hyperparameter Tuning | Evaluation and AML-vs-DL comparison *(in progress)* |
+| Lakshya (2401020036) | Evaluation and Calibration | DL dataset integration and leakage audit |
 
 ---
 

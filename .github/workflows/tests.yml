@@ -47,4 +47,4 @@ jobs:
       - name: Run dataset, encoder, and MLP tests
         run: |
           python -c "import torch; assert torch.version.cuda is None"
-          python -m pytest -q tests/test_dl_dataset.py tests/test_dl_encoding.py tests/test_dl_mlp.py
+          python -m pytest -q tests/test_dl_dataset.py tests/test_dl_encoding.py tests/test_dl_mlp.py tests/test_dl_training.py tests/test_hybrid.py
