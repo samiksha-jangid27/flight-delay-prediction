@@ -372,7 +372,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT, help="Repository root")
     parser.add_argument("--output", type=Path, default=None,
-                        help="New, separate Phase 2 evaluation output directory")
+                        help="Phase 2 evaluation output directory "
+                             "(default: reports/dl, figures in reports/dl/figures)")
     parser.add_argument("--precision-targets", type=float, nargs="+",
                         default=[0.20, 0.25, 0.30])
     parser.add_argument("--bootstrap", type=int, default=100,
@@ -380,7 +381,7 @@ def main() -> None:
     parser.add_argument("--no-plots", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
-    output = args.output or (root / "reports/dl/evaluation_shubhaang")
+    output = args.output or (root / "reports/dl")
     report = compare(Sources.from_root(root), output,
                      precision_targets=tuple(args.precision_targets),
                      bootstrap=args.bootstrap, make_plots=not args.no_plots)

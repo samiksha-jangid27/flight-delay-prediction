@@ -11,8 +11,8 @@ prior-date history subject to the availability assumptions documented below.
 Team ID `T022` &nbsp;·&nbsp; Section `C`
 
 ![Phase 1](https://img.shields.io/badge/Advanced%20ML-complete-success)
-![Phase 2](https://img.shields.io/badge/Deep%20Learning-models%20complete-blue)
-![Tests](https://img.shields.io/badge/tests-284%20passing-success)
+![Phase 2](https://img.shields.io/badge/Deep%20Learning-complete-success)
+![Tests](https://img.shields.io/badge/tests-290%20passing-success)
 ![Python](https://img.shields.io/badge/python-3.11%2B-informational)
 
 </div>
@@ -56,7 +56,7 @@ The work is delivered in two phases:
 | Phase | Focus | State |
 |-------|-------|-------|
 | **Advanced ML** | Leakage-safe data pipeline, feature engineering, classical classifiers, calibrated evaluation and offline rescheduling what-if | Complete |
-| **Deep Learning** | Embedding MLP (learned airline/airport embeddings) reusing the same partitions and pre-departure contract, plus a leakage-safe ML+DL hybrid and a DL ablation study | Models complete; AML-vs-DL comparison in progress |
+| **Deep Learning** | Embedding MLP (learned airline/airport embeddings) reusing the same partitions and pre-departure contract, plus a leakage-safe ML+DL hybrid, a DL ablation study and the AML-vs-DL comparison | Complete — embeddings match but do not beat gradient boosting; AML model retained |
 
 ---
 
@@ -336,13 +336,13 @@ flowchart LR
     D --> E[Training + tuning<br/>early stop on val AP<br/>train.py]
     E --> F[Predictions in<br/>project CSV schema]
     F --> G[Hybrid stack<br/>XGBoost + MLP<br/>hybrid.py]
-    F --> H[AML vs DL comparison<br/>Priority 5 — in progress]
+    F --> H[AML vs DL comparison<br/>compare_aml_dl.py<br/>+ reports/dl/figures]
 
     style A fill:#e8f0fe,stroke:#4285f4
     style D fill:#e8f0fe,stroke:#4285f4
     style E fill:#e8f0fe,stroke:#4285f4
     style G fill:#fef7e0,stroke:#f9ab00
-    style H fill:#f1f3f4,stroke:#9aa0a6
+    style H fill:#e6f4ea,stroke:#34a853
 ```
 
 ### Components
@@ -368,15 +368,49 @@ its best checkpoint reloads to identical predictions. On this dataset the
 embeddings **match but do not beat** gradient boosting — consistent with the
 tabular-learning literature ([dl_literature_review.md](docs/dl_literature_review.md)).
 
-### Hybrid approach (additional-marks track) — honest result
+### Hybrid approach — what we tried, why we dropped it, and what we chose instead
 
-The stacked hybrid is correctly implemented and leakage-safe, but **does not
-improve ranking** over the best single model. An error-diversity analysis
-explains why: XGBoost and MLP **residuals are 0.968-correlated**, so the models
-err on almost the same flights and no ensemble can recover orthogonal signal.
-This is reported transparently as a negative result, with representation-level
-fusion (gradient-boosted leaf features → MLP embeddings) identified as the
-justified next step. See [hybrid_approach.md](docs/hybrid_approach.md).
+The brief offers additional marks for a *meaningful and technically justified*
+ML+DL hybrid, so we implemented one, measured it honestly, and then made a
+performance-driven decision. The full method, error-diversity analysis and
+verdict are in [hybrid_approach.md](docs/hybrid_approach.md); the short version:
+
+**1. How we did it.** We built a leakage-safe *stacked ensemble*: a logistic
+meta-learner trained on two inputs — the XGBoost probability and the embedding-MLP
+probability for each flight. Both base models are fit on the **early-training
+partition only**, so their probabilities on the later `train_calibration` slice
+are genuinely out-of-sample; the meta-learner is fit on those calibration
+probabilities and evaluated on `validation`, and the held-out `test` partition is
+never touched. This is the exact "operational tabular features → learned
+temporal/route patterns" fusion the brief describes.
+
+**2. What became the problem.** The hybrid **did not improve ranking** over the
+best single model (hybrid validation AP `0.209` vs tuned XGBoost `0.211` and
+balanced LR `0.253`). The error-diversity analysis explains *why*, and this is
+the key technical finding: the XGBoost and MLP **residuals are 0.968-correlated**.
+The two model families make almost the *same* mistakes on the *same* flights, so
+there is no orthogonal signal left for an ensemble to recover. A stack can only
+help when its members err differently; here they do not. The only thing the
+hybrid improved was **calibration** (Brier `0.137`), not discrimination.
+
+**3. Why that is expected, not a bug.** The pre-departure signal in this dataset
+is weak and largely *linear* — the engineered tabular features already capture
+most of it, which is also why the MLP's validation AP peaks after a single epoch
+(see the ablation). This matches the tabular-learning literature
+([dl_literature_review.md](docs/dl_literature_review.md)): on small/medium tabular
+problems with weak signal, neither deep embeddings nor a shallow stack reliably
+beat gradient boosting.
+
+**4. What we did instead — the best thing for the project.** Rather than ship a
+more complex model that adds no ranking value, we **kept the calibrated AML model
+as the delay-risk model** and repurposed the DL/hybrid work as a *rigorous,
+honest evaluation and ablation*. That decision pays off concretely: the
+calibration insight from this analysis is exactly what powers the rescheduling
+what-if (which needs trustworthy probabilities, not just a good ranking), and the
+negative result is itself a defensible scientific contribution. The justified
+*next* step — if more capacity were warranted — is representation-level fusion
+(gradient-boosted leaf features → MLP embeddings), not another probability stack;
+this is documented but deliberately out of scope.
 
 ### Regularization & ablation
 
@@ -385,14 +419,57 @@ batch size) shows the model sits in a mild-overfitting regime where stronger
 dropout (0.3) generalizes best and validation AP peaks after a single epoch. See
 [dl_ablation.md](docs/dl_ablation.md).
 
+### AML-vs-DL evaluation and comparison
+
+The formal, independent comparison is **complete**
+([`scripts/compare_aml_dl.py`](scripts/compare_aml_dl.py),
+[dl_evaluation.md](docs/dl_evaluation.md)). It verifies all candidates share the
+**same 50,466 validation flight IDs, dates and labels**, then reports Average
+Precision, ROC-AUC, Brier, log loss, recall at an explicitly selected minimum
+precision (with 20/25/30% sensitivity), and both raw and calibrated probabilities.
+Figures are written to **[`reports/dl/figures/`](reports/dl/figures/)**:
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="reports/dl/figures/ap_comparison.png" alt="Average Precision comparison" width="100%"/>
+      <p align="center"><sub><b>Average Precision</b> — embeddings/hybrid match but do not beat gradient boosting on ranking.</sub></p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="reports/dl/figures/brier_comparison.png" alt="Brier score comparison" width="100%"/>
+      <p align="center"><sub><b>Brier score</b> (lower is better) — the DL/hybrid models' one measurable advantage is calibration.</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="reports/dl/figures/precision_recall.png" alt="Precision-recall curves" width="100%"/>
+      <p align="center"><sub><b>Precision–recall curves</b> — all candidates on the same 50,466 aligned validation flights.</sub></p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="reports/dl/figures/roc.png" alt="ROC curves" width="100%"/>
+      <p align="center"><sub><b>ROC curves</b> — modest, closely clustered discrimination (ROC-AUC ≈ 0.62).</sub></p>
+    </td>
+  </tr>
+</table>
+
+<div align="center">
+  <img src="reports/dl/figures/reliability.png" alt="Reliability diagram" width="60%"/>
+  <p><sub><b>Reliability diagram</b> — raw balanced LR is badly miscalibrated despite the best AP; isotonic calibration brings every model close to the diagonal.</sub></p>
+</div>
+
+**Conclusion.** On this dataset, learned embeddings **match but do not beat**
+gradient boosting on ranking; the DL and hybrid models' only measurable advantage
+is calibration. The project's delivered delay-risk model therefore remains the
+**calibrated AML model** from Phase 1, with the DL extension standing as a
+rigorous ablation/negative result (see the hybrid section above).
+
 ### Status
 
-Model building (dataset, encoding/embeddings, MLP, training) is **complete and
-merged**. The formal **AML-vs-DL evaluation and comparison** — PR/ROC curves,
-reliability diagrams, confusion matrices, recall at a selected precision, and the
-three-model table (`scripts/compare_aml_dl.py`, `reports/dl/figures/`) — is the
-Priority-5 deliverable and is **in progress**. A temporal (LSTM/GRU) model is
-explicitly optional and not implemented.
+Every Phase 2 deliverable is **complete and merged**: the dataset adapter,
+encoding/embeddings, MLP, training/tuning, the hybrid experiment, and the
+AML-vs-DL evaluation. A temporal (LSTM/GRU) model is explicitly optional in the
+brief and intentionally not implemented, because the single-epoch AP saturation
+shows no temporal depth is warranted on this feature set.
 
 ---
 
@@ -460,9 +537,9 @@ flight-delay-prediction/
 ├── reports/
 │   ├── figures/        EDA visualizations
 │   ├── results/        Model comparison outputs (ignored)
-│   ├── dl/             DL checkpoint, predictions, tuning + hybrid artifacts
+│   ├── dl/             DL checkpoint, predictions, tuning, hybrid + comparison artifacts, figures/
 │   └── evaluation/     Calibrated predictions, metrics, rescheduling (ignored, regenerable)
-├── scripts/            compare_models, audit, calibration, rescheduling_analysis, build_hybrid CLIs
+├── scripts/            compare_models, compare_aml_dl, audit, calibration, rescheduling_analysis, build_hybrid CLIs
 ├── src/flight_delay/
 │   ├── data/           load, target, split, pipeline, audit, prepare
 │   ├── features/       temporal, route, historical, selection, target, model_features
@@ -470,7 +547,7 @@ flight-delay-prediction/
 │   ├── deep_learning/  dataset, encoding, embeddings, mlp, train, hybrid
 │   └── evaluation/     metrics, calibration, thresholds, predictions, evaluate,
 │                       rescheduling, baselines, run_state, plots
-└── tests/              Automated test suite (284 tests; 60 cover the DL extension)
+└── tests/              Automated test suite (290 tests; 66 cover the DL extension)
 ```
 
 ---
@@ -561,10 +638,14 @@ python -m flight_delay.deep_learning.train --config configs/dl_config.yaml
 # 2. Build the leakage-safe XGBoost + MLP hybrid and the comparison summary
 #    (writes reports/dl/hybrid_validation_predictions.csv, hybrid_comparison.json)
 python scripts/build_hybrid.py
+
+# 3. Run the AML-vs-DL evaluation (writes reports/dl/summary.json, metrics.csv,
+#    reliability_*.csv and all figures to reports/dl/figures/)
+python scripts/compare_aml_dl.py --bootstrap 100
 ```
 
-Both steps keep the held-out test partition untouched; tuning and hybrid fitting
-use only the training-calibration and validation partitions.
+All steps keep the held-out test partition untouched; tuning, hybrid fitting and
+the comparison use only the training-calibration and validation partitions.
 
 ---
 
@@ -588,6 +669,7 @@ use only the training-calibration and validation partitions.
 | [dl_architecture.md](docs/dl_architecture.md) | Embedding MLP architecture, tensor interface and training interface |
 | [dl_ablation.md](docs/dl_ablation.md) | DL hyperparameter/regularization ablation study |
 | [hybrid_approach.md](docs/hybrid_approach.md) | Leakage-safe ML+DL stacked hybrid, error-diversity analysis and verdict |
+| [dl_evaluation.md](docs/dl_evaluation.md) | AML-vs-DL comparison protocol, aligned metrics, recall-at-precision and figures |
 | [dl_literature_review.md](docs/dl_literature_review.md) | Deep-learning literature review grounded in the project's findings |
 
 ---
@@ -608,6 +690,8 @@ documentation are tracked.
 | `reports/evaluation/figures/` | `evaluate` | ROC, PR, reliability, confusion and proper-score plots |
 | `reports/evaluation/frozen.joblib` | `evaluate validation` | Frozen bases, calibrators and thresholds |
 | `reports/evaluation/rescheduling/` | `scripts/rescheduling_analysis.py` | What-if JSON reports, cost-ratio sweep, net-benefit curves and figures |
+| `reports/dl/` | `train.py` / `build_hybrid.py` | MLP checkpoint, best hyperparameters, tuning results, and prediction CSVs |
+| `reports/dl/figures/` | `scripts/compare_aml_dl.py` | AML-vs-DL ROC/PR curves, reliability diagrams, AP/Brier bars and confusion matrices |
 
 Canonical frozen metrics and the 300-resample validation uncertainty interval
 are in [`docs/canonical_evaluation.json`](docs/canonical_evaluation.json).
@@ -621,10 +705,11 @@ starter dataset); it is the only tracked file under `data/`.
 
 The suite covers data loading, target construction, the chronological split,
 every feature engine, and the feature-selection guard, with particular
-attention to leakage prevention in the historical features. The **60
+attention to leakage prevention in the historical features. The **66
 deep-learning tests** add the dataset adapter contract, encoding/embedding
 behaviour, MLP forward/backward passes, training reproducibility and early
-stopping, and the hybrid's leakage/alignment guards.
+stopping, the hybrid's leakage/alignment guards, and the AML-vs-DL comparison
+(prediction alignment, recall-at-precision, calibration selection).
 
 ```bash
 pytest
@@ -656,11 +741,11 @@ versions and remaining limitations.
 
 | Member | Phase 1 — Advanced ML | Phase 2 — Deep Learning |
 |--------|------------------------|--------------------------|
-| Samiksha Jangid (2401010410) | Team Lead — Data Pipeline and Leakage Prevention | Neural network architecture (embedding MLP) |
-| Rashmi Anand (2401010374) | Exploratory Data Analysis and Feature Engineering | Training, tuning, reproducibility and prediction exports |
-| Ankit Raj Singh (2401010075) | Logistic Regression | Categorical encoding and embeddings |
-| Shubhaang Kataruka (2401010450) | XGBoost and Hyperparameter Tuning | Evaluation and AML-vs-DL comparison *(in progress)* |
-| Lakshya (2401020036) | Evaluation and Calibration | DL dataset integration and leakage audit |
+| Samiksha Jangid (2401010410) | Team Lead — Data Pipeline and Leakage Prevention | PyTorch Neural Network (embedding MLP) |
+| Rashmi Anand (2401010374) | Exploratory Data Analysis and Feature Engineering | Training & Hyperparameter Optimization |
+| Ankit Raj Singh (2401010075) | Logistic Regression | Categorical Encoding & Embeddings |
+| Shubhaang Kataruka (2401010450) | XGBoost and Hyperparameter Tuning | Evaluation & AML vs DL Comparison |
+| Lakshya (2401020036) | Evaluation and Calibration | Dataset Integration & Leakage Audit |
 
 ---
 

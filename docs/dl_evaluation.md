@@ -101,9 +101,10 @@ python scripts/verify_dl_checkpoint.py
 python scripts/compare_aml_dl.py --bootstrap 300
 ```
 
-The evaluation script writes new results to `reports/dl/evaluation_shubhaang/`:
-`summary.json`, `metrics.csv`, per-model reliability CSVs, ROC/PR curves,
-calibration plots, AP and Brier comparisons, and illustrative confusion
+The evaluation script writes new results to `reports/dl/` (override with
+`--output`): `summary.json`, `metrics.csv`, per-model reliability CSVs, and
+all figures under `reports/dl/figures/` — ROC/PR curves, calibration
+(reliability) plots, AP and Brier comparisons, and illustrative confusion
 matrices. The 0.5 confusion-matrix threshold is an explicitly **illustrative**
 fixed cut-off, not a selected operational policy. The optional paired
 calendar-day bootstrap is descriptive; it assumes exchangeable dates and

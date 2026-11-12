@@ -1,0 +1,326 @@
+{
+  "stage": "validation_only",
+  "target": "arrival delay >= 15 minutes",
+  "selection_rule": "MLP calibration selected on validation Brier, with log loss tie-break",
+  "test_used": false,
+  "n": 50466,
+  "validation_prevalence": 0.15640233028177386,
+  "train_calibration_n": 46894,
+  "train_calibration_prevalence": 0.23314283277178316,
+  "calibration_window_constant_brier": 0.1378297460866239,
+  "selected_mlp_calibration": "mlp_isotonic",
+  "precision_targets": [
+    0.2,
+    0.25,
+    0.3
+  ],
+  "models": {
+    "logistic_raw": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.2532349229370924,
+      "roc_auc": 0.6466513458914813,
+      "brier": 0.5218634160253076,
+      "log_loss": 1.395895254879722,
+      "mean_predicted_probability": 0.7818844700273031,
+      "calibration_bias": 0.6254821397455292,
+      "ece_10_equal_width_bins": 0.6254821397455292,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.7783699567463779,
+          "precision": 0.2000613371498671,
+          "recall": 0.7438236412010643,
+          "flagged": 29346
+        },
+        "0.25": {
+          "attainable": true,
+          "threshold": 0.8675489371023125,
+          "precision": 0.25,
+          "recall": 0.4343088812872165,
+          "flagged": 13712
+        },
+        "0.30": {
+          "attainable": true,
+          "threshold": 0.9038257482276822,
+          "precision": 0.30011645316918983,
+          "recall": 0.22855694919548966,
+          "flagged": 6011
+        }
+      }
+    },
+    "logistic_isotonic": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.22328480432854303,
+      "roc_auc": 0.6359764924714507,
+      "brier": 0.15089930541458618,
+      "log_loss": 0.4821967032726052,
+      "mean_predicted_probability": 0.305147348318853,
+      "calibration_bias": 0.14874501803707912,
+      "ece_10_equal_width_bins": 0.14874501803707912,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.31868131868131866,
+          "precision": 0.2017932489451477,
+          "recall": 0.7270999619916382,
+          "flagged": 28440
+        },
+        "0.25": {
+          "attainable": true,
+          "threshold": 0.35891767980074046,
+          "precision": 0.3810763888888889,
+          "recall": 0.05561890282528823,
+          "flagged": 1152
+        },
+        "0.30": {
+          "attainable": true,
+          "threshold": 0.35891767980074046,
+          "precision": 0.3810763888888889,
+          "recall": 0.05561890282528823,
+          "flagged": 1152
+        }
+      }
+    },
+    "xgboost_raw": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.21121071061073393,
+      "roc_auc": 0.6277638573889743,
+      "brier": 0.3059228830941521,
+      "log_loss": 0.8600103836908174,
+      "mean_predicted_probability": 0.5401714212145136,
+      "calibration_bias": 0.3837690909327397,
+      "ece_10_equal_width_bins": 0.3837690909327397,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.4603009819984436,
+          "precision": 0.20009044422026645,
+          "recall": 0.7287469910046876,
+          "flagged": 28747
+        },
+        "0.25": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        },
+        "0.30": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        }
+      }
+    },
+    "xgboost_isotonic": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.2128711584609638,
+      "roc_auc": 0.6279266693803041,
+      "brier": 0.1371990033119259,
+      "log_loss": 0.442804442112657,
+      "mean_predicted_probability": 0.23097857624710916,
+      "calibration_bias": 0.0745762459653353,
+      "ece_10_equal_width_bins": 0.0745762459653353,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.212913143735588,
+          "precision": 0.20032857941834453,
+          "recall": 0.7260864056759153,
+          "flagged": 28608
+        },
+        "0.25": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        },
+        "0.30": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        }
+      }
+    },
+    "mlp_raw": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.2065833894139669,
+      "roc_auc": 0.6205716917224291,
+      "brier": 0.20852382017824547,
+      "log_loss": 0.5975563327689024,
+      "mean_predicted_probability": 0.40292348401260086,
+      "calibration_bias": 0.246521153730827,
+      "ece_10_equal_width_bins": 0.24652115373082703,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.34270012378692627,
+          "precision": 0.20006271558482283,
+          "recall": 0.7274800456100342,
+          "flagged": 28701
+        },
+        "0.25": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        },
+        "0.30": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        }
+      }
+    },
+    "hybrid": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.209296460072176,
+      "roc_auc": 0.6255159957488036,
+      "brier": 0.13714529240188053,
+      "log_loss": 0.4411378116981729,
+      "mean_predicted_probability": 0.22823821518200965,
+      "calibration_bias": 0.07183588490023579,
+      "ece_10_equal_width_bins": 0.07183588490023579,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.17501809212927064,
+          "precision": 0.2000420182779509,
+          "recall": 0.7238059039655391,
+          "flagged": 28559
+        },
+        "0.25": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        },
+        "0.30": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        }
+      }
+    },
+    "mlp_sigmoid": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.2065833894139669,
+      "roc_auc": 0.6205716917224291,
+      "brier": 0.13805961748618414,
+      "log_loss": 0.44626299432803385,
+      "mean_predicted_probability": 0.2449337761140342,
+      "calibration_bias": 0.08853144583226033,
+      "ece_10_equal_width_bins": 0.08853144583226033,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.21457377577109624,
+          "precision": 0.20006271558482283,
+          "recall": 0.7274800456100342,
+          "flagged": 28701
+        },
+        "0.25": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        },
+        "0.30": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        }
+      }
+    },
+    "mlp_isotonic": {
+      "n": 50466,
+      "prevalence": 0.15640233028177386,
+      "average_precision": 0.20815790670767034,
+      "roc_auc": 0.6207356568891057,
+      "brier": 0.13747563697797344,
+      "log_loss": 0.4450537677206867,
+      "mean_predicted_probability": 0.24251260014388212,
+      "calibration_bias": 0.08611026986210826,
+      "ece_10_equal_width_bins": 0.08611026986210818,
+      "recall_at_min_precision": {
+        "0.20": {
+          "attainable": true,
+          "threshold": 0.23959938366718028,
+          "precision": 0.2022395291246456,
+          "recall": 0.7139237298872418,
+          "flagged": 27863
+        },
+        "0.25": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        },
+        "0.30": {
+          "attainable": false,
+          "threshold": null,
+          "precision": null,
+          "recall": null,
+          "flagged": 0
+        }
+      }
+    }
+  },
+  "artifact_sha256": {
+    "logistic_raw": "a677df112a861bf0e6d1f71cf96990c791ff165e7dd8f83a4a9ebcc6a453a75f",
+    "logistic_isotonic": "c05195d4d7d27262a11b83adb12ab18ef81b272393107dac41dfed0745b9f9c0",
+    "xgboost_raw": "df3cf42a6c0340bdcd49058c4f950b5fb87cbc083f7b11a025286651e759c71e",
+    "xgboost_isotonic": "505e08bd54aee85ed23ff534cc050367571cc273cac8b0d1103e49227555f973",
+    "mlp_raw": "481dad8a7e3dbb2ef08852046cfb4e6cf0e4df92bc1fd3de3d3390476098228d",
+    "hybrid": "10e3b463f4a413540a1786c36f4cfee688e78a2258aa1d06b939b35e0517b38a",
+    "mlp_train_calibration": "baad36ab520f3420b85be92537d6b767b3da9560b62b910083a70c6fa36884ab"
+  },
+  "paired_ap_bootstrap": {
+    "mlp_raw_minus_logistic_raw": {
+      "n_boot": 100,
+      "valid": 100,
+      "interval": [
+        -0.06456216795861697,
+        -0.024974095724514075
+      ],
+      "difference": -0.04665153352312548
+    },
+    "mlp_selected_minus_xgboost_isotonic": {
+      "n_boot": 100,
+      "valid": 100,
+      "interval": [
+        -0.01927805942767964,
+        0.004651765033173792
+      ],
+      "difference": -0.004713251753293457
+    }
+  },
+  "limitations": [
+    "Validation-only results; calibration and threshold selection here are not independent final-test claims",
+    "Historical previous-date outcomes have unresolved exact real-time availability",
+    "Precision-target recall is marked unattainable instead of fabricating a threshold",
+    "Paired date bootstrap treats days as exchangeable and is descriptive, not a serial-block CI"
+  ]
+}
