@@ -49,6 +49,16 @@ def save(tmp_path, raw):
     return path
 
 
+def test_schedule_and_route_exclude_outcome_history_on_the_same_rows(tmp_path, raw):
+    path = save(tmp_path, raw)
+    full = build_dl_dataset(path)
+    route = build_dl_dataset(path, feature_set="route")
+    assert set(full.numeric_features) - set(route.numeric_features) == set(HISTORICAL_FEATURES)
+    assert route.categorical_features == full.categorical_features
+    for name, partition in route.partitions.items():
+        pd.testing.assert_frame_equal(partition.metadata, full.partitions[name].metadata)
+
+
 def assert_alignment(result, original):
     combined_train = pd.concat(
         [

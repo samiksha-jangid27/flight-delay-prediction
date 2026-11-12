@@ -2,7 +2,7 @@
 
 Rationale
 ---------
-XGBoost splits on tabular operational features (schedule, congestion, calendar,
+XGBoost splits on tabular operational features (schedule, route, calendar,
 historical delay rates) and captures sharp threshold interactions. The embedding
 MLP instead learns dense latent representations for carrier/origin/dest and smooth
 combinations of the standardized numeric block. The two model families therefore
@@ -17,7 +17,7 @@ Both base models are trained only on the early-training partition. Their
 probabilities on the later ``train_calibration`` rows are therefore genuinely
 out-of-sample, so the meta-learner is fitted there without seeing any row its
 inputs were trained on. The meta-learner is evaluated on ``validation`` and the
-held-out ``test`` partition is never loaded, scored, or used for selection.
+held-out ``test`` partition returned by the shared data pipeline is unused.
 """
 
 from __future__ import annotations
@@ -117,7 +117,7 @@ def _merge_base_predictions(
 
     left = xgb.rename(columns={"y_probability": "xgb"})
     right = mlp.rename(columns={"y_probability": "mlp"})[
-        ["flight_id", "y_true", "mlp"]
+        ["flight_id", "flight_date", "y_true", "mlp"]
     ]
     merged = left.merge(
         right, on="flight_id", how="inner", suffixes=("", "_mlp"), validate="one_to_one"
@@ -128,7 +128,11 @@ def _merge_base_predictions(
         )
     if not (merged["y_true"] == merged["y_true_mlp"]).all():
         raise ValueError(f"{partition} labels disagree between XGBoost and MLP")
-    return merged.drop(columns="y_true_mlp")
+    xgb_dates = pd.to_datetime(merged["flight_date"], errors="raise")
+    mlp_dates = pd.to_datetime(merged["flight_date_mlp"], errors="raise")
+    if xgb_dates.isna().any() or not xgb_dates.eq(mlp_dates).all():
+        raise ValueError(f"{partition} flight dates disagree between XGBoost and MLP")
+    return merged.drop(columns=["flight_date_mlp", "y_true_mlp"])
 
 
 def fit_meta_learner(

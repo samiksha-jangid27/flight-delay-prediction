@@ -105,6 +105,15 @@ def test_label_disagreement_is_rejected():
         fit_meta_learner(cal_xgb, cal_mlp)
 
 
+def test_date_disagreement_is_rejected():
+    y, xgb_p, mlp_p = _complementary_split(n=20)
+    cal_xgb = _frame("train_calibration", range(20), y, xgb_p)
+    cal_mlp = _frame("train_calibration", range(20), y, mlp_p)
+    cal_mlp.loc[0, "flight_date"] = "2013-07-01"
+    with pytest.raises(ValueError, match="flight dates disagree"):
+        fit_meta_learner(cal_xgb, cal_mlp)
+
+
 def test_error_diversity_detects_redundant_models():
     y, xgb_p, _ = _complementary_split(n=200)
     ids = range(len(y))

@@ -49,14 +49,20 @@ class DLDataset:
         return {f: len(v) + 2 for f, v in self.vocabularies.items()}
 
 
-def build_dl_dataset(path: str | Path) -> DLDataset:
+def build_dl_dataset(path: str | Path, *, feature_set: str = "full") -> DLDataset:
     """Reuse Phase 1 population, target (>=15m), and whole-date partitions.
 
     Split only original training into early train / late train_calibration,
     exactly as Phase 1 evaluation does. Fit all transformations on early train.
     Missing numeric values use its median (zero for all-missing columns), then
     population-standardize; constant columns have scale one. Fail on infinity.
+    Use `route` for the schedule-and-route comparison without historical outcomes.
     """
+    if feature_set not in ("full", "route"):
+        raise ValueError("DL feature_set must be 'full' or 'route'")
+    numeric_features = tuple(
+        field for field in FEATURE_SETS[feature_set] if field not in CATEGORICAL_FEATURES
+    )
     train, validation, test = build_data_pipeline(path)
     days = sorted(pd.to_datetime(train[["year", "month", "day"]]).unique())
     if len(days) < 2:
@@ -86,8 +92,8 @@ def build_dl_dataset(path: str | Path) -> DLDataset:
             raise ValueError(f"Missing flight IDs: {name}")
         if not frame["is_delayed"].isin([0, 1]).all():
             raise ValueError(f"Missing or invalid labels: {name}")
-        selected[name] = select_model_features(frame, "full").reset_index(drop=True)
-        numeric = selected[name].loc[:, list(NUMERIC)].to_numpy(dtype=float)
+        selected[name] = select_model_features(frame, feature_set).reset_index(drop=True)
+        numeric = selected[name].loc[:, list(numeric_features)].to_numpy(dtype=float)
         if np.isinf(numeric).any():
             raise ValueError(f"Infinite numeric features: {name}")
         metadata[name] = pd.DataFrame(
@@ -101,8 +107,8 @@ def build_dl_dataset(path: str | Path) -> DLDataset:
     if pd.concat([m.flight_id for m in metadata.values()]).duplicated().any():
         raise ValueError("Flight IDs must be globally unique")
     base = selected["train"]
-    medians = base.loc[:, list(NUMERIC)].median().fillna(0.0)
-    imputed = base.loc[:, list(NUMERIC)].fillna(medians)
+    medians = base.loc[:, list(numeric_features)].median().fillna(0.0)
+    imputed = base.loc[:, list(numeric_features)].fillna(medians)
     means = imputed.mean()
     scales = imputed.std(ddof=0).replace(0.0, 1.0)
     vocabularies = {
@@ -115,7 +121,7 @@ def build_dl_dataset(path: str | Path) -> DLDataset:
     partitions = {}
     for name, features in selected.items():
         numeric = (
-            (features.loc[:, list(NUMERIC)].fillna(medians) - means) / scales
+            (features.loc[:, list(numeric_features)].fillna(medians) - means) / scales
         ).to_numpy(dtype=np.float32)
         if not np.isfinite(numeric).all():
             raise ValueError(f"Nonfinite transformed numeric features: {name}")
@@ -131,4 +137,6 @@ def build_dl_dataset(path: str | Path) -> DLDataset:
             ]
         )
         partitions[name] = DLPartition(numeric, categorical, metadata[name])
-    return DLDataset(partitions, medians, means, scales, vocabularies)
+    return DLDataset(
+        partitions, medians, means, scales, vocabularies, numeric_features=numeric_features
+    )

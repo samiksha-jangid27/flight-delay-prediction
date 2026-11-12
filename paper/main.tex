@@ -1,9 +1,10 @@
-%% Flight Delay Prediction --- Advanced Machine Learning Phase (Project 21, Team T022)
+%% Flight Delay Prediction --- Phase 1 and Phase 2 (Project 21, Team T022)
 %% IEEE conference-style report. Compiles with pdflatex (IEEEtran class).
 
 \documentclass[conference]{IEEEtran}
 \IEEEoverridecommandlockouts
 
+\usepackage[T1]{fontenc}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -29,7 +30,8 @@
 
 \begin{document}
 
-\title{Flight Delay Prediction via Gradient Boosting and\\ Calibrated Classical Learning: A Leakage-Safe Pipeline\\ with an Offline Rescheduling What-If Analysis}
+\title{Flight Delay Prediction via Gradient Boosting and Temporal Deep Learning\\
+An Offline Rescheduling Analysis}
 
 \author{
 \IEEEauthorblockN{Samiksha Jangid}
@@ -77,13 +79,16 @@ derive an offline cost-sensitive rescheduling rule with a closed-form net-benefi
 and a cost-optimal action threshold $\tau^\star = C_a/(r\,C_d)$, and report a
 sensitivity analysis: a model-guided rule beats inaction only when interventions
 are cheap relative to a delay, and XGBoost has the more favourable cost-sensitivity
-profile over the meaningful cost range. We emphasise honest reporting of limitations and treat
-this phase as the calibrated baseline for a subsequent deep-learning extension.
+profile over the evaluated cost range. In Phase 2, calibrated XGBoost, the
+embedding MLP and the XGBoost--MLP stack achieved validation AP of $0.2129$,
+$0.2082$ and $0.2093$, respectively. The stack's Brier score was $0.137145$,
+compared with $0.137199$ for calibrated XGBoost. The offline decision analysis
+uses the calibrated classical models.
 \end{abstract}
 
 \begin{IEEEkeywords}
 flight delay prediction, data leakage, probability calibration, gradient
-boosting, class imbalance, cost-sensitive decision analysis, decision curve
+boosting, entity embeddings, cost-sensitive decision analysis, decision curve
 analysis.
 \end{IEEEkeywords}
 
@@ -102,8 +107,8 @@ A second risk is \emph{miscalibration}: a classifier may rank flights well yet
 emit probabilities that do not correspond to real-world frequencies, which is
 fatal for any downstream decision rule that thresholds a probability.
 
-This report, covering the Advanced Machine Learning phase of the project, makes
-four contributions. First, a leakage-aware data pipeline with three independent
+This report covers both phases of the project. First, it describes a data
+pipeline with three independent
 defences (Section~\ref{sec:method}). Second, documented and unit-tested feature
 engineering, including a cyclic time encoding and prior-date historical
 aggregates (Section~\ref{sec:features}). Third, a calibrated chronological
@@ -112,7 +117,9 @@ with frozen held-out results and explicit test-period reuse disclosure
 (Section~\ref{sec:results}). Fourth, an offline
 rescheduling what-if analysis built on explicit cost assumptions, including the
 cost-optimal operating threshold and a sensitivity study
-(Section~\ref{sec:resched}). Throughout, we favour transparent reporting of
+(Section~\ref{sec:resched}). Fifth, it evaluates the embedding MLP and an
+ML+DL stack on aligned validation flights (Section~\ref{sec:deeplearning}).
+Throughout, we favour transparent reporting of
 weaknesses over optimistic claims.
 
 \section{Related Work}
@@ -666,45 +673,85 @@ concatenated with the embeddings and passed through dense layers with ReLU
 activations and dropout, producing a single delay logit per flight. Reserved
 indices for missing ($0$) and unseen ($1$) categories let the model score
 airports and carriers absent from the training period without errors.
+Cyclic calendar inputs encode scheduled time, and the MLP operates on one
+flight per row.
 
 \subsection{Training and reproducibility}
 The network is trained with \code{BCEWithLogitsLoss} and the AdamW optimiser.
 Early stopping monitors validation Average Precision (AP) with a fixed patience,
 and the best checkpoint is restored. Python, NumPy, and PyTorch seeds are fixed
-and deterministic algorithms requested, so a repeated run reproduces the exported
-probabilities bit-for-bit. Hyperparameters are tuned by a seed-controlled search
+and deterministic algorithms requested. Repeated CPU runs in the verification
+environment reproduced the exported probabilities bit-for-bit.
+Hyperparameters are tuned by a seed-controlled search
 over learning rate, batch size, hidden widths, dropout, and weight decay, selected
 on validation AP alone.
 
 \subsection{Regularisation and ablation}
-A one-factor-at-a-time ablation around the baseline configuration (full table in
-the supplementary \code{docs/dl\_ablation.md}) shows the model sits in a mild
-over-fitting regime: the strongest dropout ($0.3$) gives the best validation AP,
-while shrinking the network and increasing weight decay also help, and a smaller
-batch is the only change that hurts. Validation AP peaks after a single epoch in
-five of six configurations, indicating the engineered features carry most of
-their signal immediately and leave little for additional epochs to extract.
+The original search varied hyperparameters and seeds. A separate ablation
+compared all six configurations at the same three seeds (42, 46 and 50).
+Each result is paired against the baseline at the corresponding seed.
+Lowering the learning rate improved AP by $0.004759$ on average. Raising
+dropout to $0.3$ improved it by $0.002135$ on average. The matched-seed
+results are reported separately from checkpoint selection.
 
 \subsection{Hybrid approach}
-We additionally implement a leakage-safe stacked ensemble: a logistic
+We implement a stacked ensemble with a logistic
 meta-learner over the frozen XGBoost and MLP probabilities, fitted only on the
 calibration partition and evaluated on validation. The stack does \emph{not}
-improve ranking over the best single model. An error-diversity analysis explains
-why: the XGBoost and MLP residuals are $0.968$-correlated, so the models are
-wrong on almost the same flights and no ensemble can recover orthogonal signal.
-This is consistent with the tabular-learning literature, in which gradient-boosted
-trees match or beat neural models on feature-engineered
-problems~\cite{grinsztajn,shwartzziv}. We report this transparently as a
-negative result and identify representation-level fusion (gradient-boosted leaf
-features as additional embeddings~\cite{fbgbdt}) as the justified next step.
+improve ranking over the best single model. The XGBoost and MLP residuals have
+correlation $0.968$, indicating substantial overlap in their validation errors.
+The result is consistent with work showing that gradient-boosted trees can be
+strong on feature-engineered tabular problems~\cite{grinsztajn,shwartzziv}.
+Representation-level fusion through gradient-boosted leaf features is one
+possible follow-up~\cite{fbgbdt}.
 
 \subsection{Fair comparison protocol}
 The embedding MLP exports probabilities on the same calibration and validation
 rows, with identical flight identifiers, dates, and labels, in the project
-prediction schema. The full AML-versus-DL comparison---PR-AUC, ROC-AUC, recall at
-a selected operational precision, confusion matrices, and reliability
-diagrams---follows the frozen Phase 1 evaluation protocol and is reported with
-the DL evaluation artifacts.
+prediction schema. Calibration is fitted on 46,894 late-training flights.
+Table~\ref{tab:dl-validation} reports scores on the same 50,466 validation
+flights. AP and trapezoidal PR area are reported separately. The 25\% precision
+floor was attainable for calibrated Logistic Regression (5.56\% recall) and
+unattainable for calibrated XGBoost, calibrated MLP and the hybrid. The exported
+precision, recall, F1 and confusion counts use each model's validation maximum
+F1 threshold. These operating points describe validation performance.
+
+\begin{table}[t]
+\centering
+\caption{Phase 2 validation on 50,466 aligned flights.}
+\label{tab:dl-validation}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Model & AP & PR AUC & ROC-AUC & Brier \\
+\midrule
+Logistic (iso.) & .2233 & .2641 & .6360 & .150899 \\
+XGBoost (iso.) & .2129 & .2114 & .6279 & .137199 \\
+MLP (iso.) & .2082 & .2039 & .6207 & .137476 \\
+Hybrid & .2093 & .2092 & .6255 & .137145 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{phase2-reliability}
+  \caption{Validation reliability for the calibrated AML models, calibrated
+  embedding MLP, and hybrid. The diagonal indicates perfect calibration.}
+  \label{fig:phase2-reliability}
+\end{figure}
+
+\subsection{Schedule and route inputs}
+We also compare the models using only the 23 schedule and route predictors.
+This comparison uses the same flights and omits all eight outcome-history
+predictors, whose availability at the decision timestamp is unverified.
+With these inputs, AP was $0.2217$ for calibrated Logistic
+Regression, $0.2116$ for calibrated XGBoost, $0.2075$ for the calibrated MLP,
+and $0.2080$ for the hybrid. Under the headline action-cost ratio of $0.25$
+and recovery of $0.8$, all four policies incurred higher simulated costs than
+inaction. AP remains the primary ranking metric because trapezoidal PR area
+can be sensitive to interpolation at the endpoint when isotonic calibration
+creates large tied groups.
 
 \section{Discussion and Limitations}
 \label{sec:discussion}
@@ -739,22 +786,26 @@ what-if analysis grounded in explicit cost assumptions. XGBoost is the stronger
 descriptive candidate and the better basis for a cost-sensitive rescheduling
 rule, which nonetheless pays off only under cheap-intervention assumptions.
 
-The deep-learning phase will extend this baseline with learned entity embeddings
-for airline, origin and destination, and an optional temporal sequence model over
-correctly ordered flight history, benchmarked against the calibrated classical
-models reported here on the same chronological protocol and metrics. The larger
-BTS on-time dataset offers a route to broader geographic coverage and a sterner
-test of generalisation.
+The embedding MLP and stacked hybrid were evaluated on the same validation
+flights as the classical models. The hybrid's Brier gain over calibrated
+XGBoost was $0.000054$, with lower AP. The larger BTS on-time dataset offers a
+route to broader geographic coverage and a sterner test of generalisation.
 
 \section*{Reproducibility}
 The pipeline, models, evaluation and rescheduling analysis are implemented as a
-tested Python package (\code{random\_seed}$=42$), with $224$ passing automated
-tests and a continuous-integration workflow. The frozen evaluation records the
+tested Python package with continuous integration for the classical and
+CPU PyTorch paths. The frozen evaluation records the
 dataset and artifact SHA-256 hashes and the exact dependency versions, so a
 reviewer can confirm that the reported numbers came from the committed data and
 code; the final test stage is additionally guarded so it cannot be silently
 re-run or re-selected.
 
+\section*{Team Contributions}
+In Phase 2, Lakshya integrated the dataset and audited historical availability.
+Ankit Raj Singh implemented categorical encoding and embedding tables.
+Samiksha Jangid implemented the embedding MLP and architecture tests.
+Rashmi Anand implemented training, tuning and checkpoint export.
+Shubhaang Kataruka implemented the AML--DL comparison and checkpoint audit.
 
 
 
