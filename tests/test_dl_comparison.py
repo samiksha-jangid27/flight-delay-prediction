@@ -13,6 +13,7 @@ from compare_aml_dl import (  # noqa: E402
     Sources,
     compare,
     load_predictions,
+    metrics,
     threshold_at_min_precision,
 )
 
@@ -66,7 +67,14 @@ def test_full_comparison_writes_validated_metrics_and_figures(tmp_path):
                  "figures/ap_comparison.png", "figures/brier_comparison.png"):
         assert (output / name).is_file(), name
     assert len(list((output / "figures").glob("confusion_*.png"))) >= 3
-    pd.read_csv(output / "metrics.csv").set_index("model").loc["mlp_raw"]
+    metrics = pd.read_csv(output / "metrics.csv").set_index("model").loc["mlp_raw"]
+    assert 0 <= metrics["pr_auc_trapezoidal"] <= 1
+    assert sum(metrics[key] for key in ("tn", "fp", "fn", "tp")) == result["n"]
+    assert metrics["precision"] == pytest.approx(metrics["tp"] / (metrics["tp"] + metrics["fp"]))
+    assert metrics["recall"] == pytest.approx(metrics["tp"] / (metrics["tp"] + metrics["fn"]))
+    assert metrics["f1"] == pytest.approx(
+        2 * metrics["tp"] / (2 * metrics["tp"] + metrics["fp"] + metrics["fn"])
+    )
     assert result["paired_ap_bootstrap"]["mlp_raw_minus_logistic_raw"]["valid"] > 0
 
 
@@ -95,6 +103,12 @@ def test_precision_unattainable_is_explicit_not_fabricated():
     result = threshold_at_min_precision(y, p, 0.25)
     assert result == {"attainable": False, "threshold": None,
                       "precision": None, "recall": None, "flagged": 0}
+
+
+def test_average_precision_and_trapezoidal_area_are_distinct():
+    scores = metrics(np.array([1, 0, 1, 0]), np.array([0.9, 0.8, 0.7, 0.6]), (0.25,))
+    assert scores["average_precision"] == pytest.approx(5 / 6)
+    assert scores["pr_auc_trapezoidal"] == pytest.approx(19 / 24)
 
 
 def test_nonfinite_or_duplicate_predictions_fail(tmp_path):

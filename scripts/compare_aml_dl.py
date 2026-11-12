@@ -24,6 +24,7 @@ from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
+    auc,
     average_precision_score,
     brier_score_loss,
     confusion_matrix,
@@ -32,6 +33,8 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
+
+from flight_delay.evaluation.thresholds import select_thresholds, threshold_table
 
 ROOT = Path(__file__).resolve().parents[1]
 PROBABILITY_COLUMNS = ("flight_id", "flight_date", "y_true", "y_probability", "partition")
@@ -169,10 +172,17 @@ def metrics(y: np.ndarray, p: np.ndarray, targets: tuple[float, ...]) -> dict:
     if not np.isfinite(p).all() or np.any((p < 0) | (p > 1)):
         raise ValueError("Prediction probabilities must be finite in [0,1]")
     bins = reliability(y, p)
+    precision, recall, _ = precision_recall_curve(y, p)
+    operating_point = select_thresholds(threshold_table(y, p), precision_floors=())["max_f1"]
+    threshold_metrics = {
+        key: float(operating_point[key]) for key in ("threshold", "precision", "recall", "f1")
+    }
+    threshold_metrics.update({key: int(operating_point[key]) for key in ("tn", "fp", "fn", "tp")})
     return {
         "n": int(len(y)),
         "prevalence": float(y.mean()),
         "average_precision": float(average_precision_score(y, p)),
+        "pr_auc_trapezoidal": float(auc(recall, precision)),
         "roc_auc": float(roc_auc_score(y, p)),
         "brier": float(brier_score_loss(y, p)),
         "log_loss": float(log_loss(y, p, labels=[0, 1])),
@@ -186,6 +196,7 @@ def metrics(y: np.ndarray, p: np.ndarray, targets: tuple[float, ...]) -> dict:
             f"{value:.2f}": threshold_at_min_precision(y, p, value)
             for value in targets
         },
+        "validation_max_f1": threshold_metrics,
     }
 
 
@@ -269,13 +280,13 @@ def create_plots(out: Path, y: np.ndarray, predictions: dict[str, np.ndarray],
         fig.savefig(figures / filename, dpi=150)
         plt.close(fig)
     for name in ("logistic_isotonic", "xgboost_isotonic", selected, "hybrid"):
-        # Fixed 0.5 threshold is illustrative, NOT a tuned operating policy.
+        threshold = summary["models"][name]["validation_max_f1"]["threshold"]
         fig, ax = plt.subplots(figsize=(5, 4))
-        ConfusionMatrixDisplay(confusion_matrix(y, predictions[name] >= 0.5,
+        ConfusionMatrixDisplay(confusion_matrix(y, predictions[name] >= threshold,
                                                 labels=[0, 1]),
                                display_labels=["Not delayed", "Delayed"]).plot(
                                    ax=ax, colorbar=False)
-        ax.set_title(f"{MODEL_NAMES[name]} @ 0.5 (illustrative)")
+        ax.set_title(f"{MODEL_NAMES[name]} at validation max F1")
         fig.tight_layout()
         fig.savefig(figures / f"confusion_{name}.png", dpi=150)
         plt.close(fig)
@@ -353,8 +364,10 @@ def compare(sources: Sources, output: Path, *,
     rows = []
     for name, m in stats.items():
         rows.append({"model": name, "average_precision": m["average_precision"],
+                     "pr_auc_trapezoidal": m["pr_auc_trapezoidal"],
                      "roc_auc": m["roc_auc"], "brier": m["brier"],
                      "log_loss": m["log_loss"], "ece_10_bins": m["ece_10_equal_width_bins"],
+                     **m["validation_max_f1"],
                      **{f"recall_at_precision_{target:.2f}":
                         m["recall_at_min_precision"][f"{target:.2f}"]["recall"]
                         for target in precision_targets}})

@@ -1,10 +1,8 @@
-"""Build and evaluate the leakage-safe XGBoost + MLP stacked hybrid.
+"""Build and evaluate the XGBoost + MLP stacked hybrid.
 
 This produces the hybrid's validation predictions in the canonical project
-schema and a raw metrics comparison against each base model. It intentionally
-does NOT touch the Priority-5 evaluation deliverables (compare_aml_dl.py,
-docs/dl_evaluation.md, reports/dl/figures/); the exported hybrid CSV is meant to
-be consumed by that comparison as one more model.
+schema and a raw metrics comparison against each base model. Run the Phase 1
+validation stage first to generate the frozen XGBoost checkpoint.
 """
 
 from __future__ import annotations
@@ -32,6 +30,11 @@ def main() -> None:
     parser.add_argument("--dl-dir", default="reports/dl")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    if not Path(args.frozen).is_file():
+        parser.error(
+            f"Missing frozen Phase 1 checkpoint {args.frozen}. Generate it with "
+            "python -m flight_delay.evaluation.evaluate validation or pass --frozen."
+        )
 
     dl_dir = Path(args.dl_dir)
     mlp_cal = load_prediction_csv(
@@ -40,13 +43,18 @@ def main() -> None:
     mlp_val = load_prediction_csv(
         dl_dir / "validation_predictions.csv", partition="validation"
     )
+    if (
+        pd.to_datetime(mlp_cal.flight_date).max() >= pd.to_datetime(mlp_val.flight_date).min()
+        or not set(mlp_cal.flight_id).isdisjoint(mlp_val.flight_id)
+    ):
+        raise ValueError("Calibration must precede validation with disjoint flight IDs")
 
     xgb_cal, xgb_val = xgb_raw_probabilities(args.data, args.frozen)
-    xgb_cal.to_csv(dl_dir / "xgb_train_calibration_predictions.csv", index=False)
-    xgb_val.to_csv(dl_dir / "xgb_validation_predictions.csv", index=False)
 
     meta = fit_meta_learner(xgb_cal, mlp_cal, seed=args.seed)
     hybrid_val = predict_hybrid(meta, xgb_val, mlp_val)
+    xgb_cal.to_csv(dl_dir / "xgb_train_calibration_predictions.csv", index=False)
+    xgb_val.to_csv(dl_dir / "xgb_validation_predictions.csv", index=False)
     hybrid_val.to_csv(dl_dir / "hybrid_validation_predictions.csv", index=False)
 
     comparison = {
