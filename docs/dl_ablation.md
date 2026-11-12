@@ -1,57 +1,37 @@
-# Deep Learning Ablation Study
+# Deep learning hyperparameter search and ablation
 
-This study isolates the effect of each training and regularization choice on the
-embedding MLP. All runs are seed-controlled and reproducible via
-`src/flight_delay/deep_learning/train.py`; the raw numbers are in
-`reports/dl/tuning_results.csv`. Selection uses validation Average Precision (AP);
-the held-out **test partition is never used**.
+The six-trial search in [tuning_results.csv](../reports/dl/tuning_results.csv)
+uses a different seed for each configuration. It selected the published
+checkpoint with dropout 0.3, seed 46, and validation AP 0.206583. The search
+scores combine the effects of hyperparameter choice and random initialization
+and batch order.
 
-## Design
+## Matched-seed ablation
 
-The search is a one-factor-at-a-time ablation around a baseline configuration.
-Each trial changes exactly one hyperparameter from trial 0, so the change in
-validation AP is attributable to that single factor.
+The controlled experiment runs all six configurations at each of seeds 42, 46,
+and 50. Each variant changes one hyperparameter from the baseline. The table
+subtracts the baseline validation AP at the same seed, then summarizes the
+three paired differences. All trials use the same chronological training and
+validation windows and the same early-stopping rule.
 
-| Trial | Changed from baseline | LR | Batch | Hidden | Dropout | Weight decay | Best epoch | Val AP |
-|---|---|---|---|---|---|---|---|---|
-| 0 | baseline | 0.001 | 1024 | [128,64] | 0.1 | 1e-4 | 1 | 0.1994 |
-| 1 | LR ↓ 0.0005 | 0.0005 | 1024 | [128,64] | 0.1 | 1e-4 | 1 | 0.2060 |
-| 2 | batch ↓ 512 | 0.001 | 512 | [128,64] | 0.1 | 1e-4 | 3 | 0.1973 |
-| 3 | smaller net [64,32] | 0.001 | 1024 | [64,32] | 0.1 | 1e-4 | 1 | 0.2037 |
-| 4 | dropout ↑ 0.3 | 0.001 | 1024 | [128,64] | 0.3 | 1e-4 | 1 | **0.2066** |
-| 5 | weight decay ↑ 1e-3 | 0.001 | 1024 | [128,64] | 0.1 | 1e-3 | 1 | 0.2058 |
+| Change from baseline | Mean AP change | Min | Max |
+|---|---:|---:|---:|
+| Learning rate 0.001 → 0.0005 | +0.004759 | +0.004466 | +0.005189 |
+| Batch size 1024 → 512 | −0.004602 | −0.006085 | −0.003278 |
+| Hidden widths [128, 64] → [64, 32] | +0.001489 | +0.000046 | +0.002479 |
+| Dropout 0.1 → 0.3 | +0.002135 | +0.001270 | +0.002942 |
+| Weight decay 0.0001 → 0.001 | +0.000027 | −0.000022 | +0.000092 |
 
-## Findings
+The lower learning rate had the largest mean gain among the tested changes.
+Dropout improved AP at all three tested seeds. The weight-decay differences
+were small and changed sign. These results describe the tested settings and
+seeds on the validation window. The published checkpoint remains the one
+selected by the original search, and the ablation is reported separately.
 
-1. **Regularization helps; capacity does not.** The best configuration (trial 4)
-   is the one with the **strongest dropout (0.3)**. Shrinking the network
-   (trial 3) and increasing weight decay (trial 5) both also improve on the
-   baseline. The model is in a mild-overfitting regime where *less effective
-   capacity* generalizes better — expected for a dataset with weak
-   pre-departure signal.
-2. **Lower learning rate / larger batch is better.** Halving the learning rate
-   (trial 1) gives the single largest gain; the smaller batch (trial 2) is the
-   only change that *hurts*, consistent with noisier gradient estimates.
-3. **The model saturates almost immediately.** Best epoch is 1 for five of six
-   trials: validation AP peaks after a single pass and early stopping then halts
-   training. This is not a bug — it reflects that the engineered tabular features
-   carry most of their signal linearly, leaving little for additional epochs to
-   extract. It also explains why the embedding MLP does not out-rank the AML
-   baseline (see `docs/hybrid_approach.md`).
+The MLP uses dropout, AdamW weight decay, and early stopping on validation AP.
+The unseen embedding index maps to a frozen zero vector. The per-run data are
+in [controlled_ablation.csv](../reports/dl/controlled_ablation.csv).
 
-## Regularization summary (rubric: "DL Dataset & Regularization")
-
-The MLP uses three complementary regularizers, all validated above:
-- **Dropout** (0.1–0.3) between dense layers — the most impactful lever.
-- **Weight decay** (1e-4–1e-3) via AdamW decoupled L2.
-- **Early stopping** on validation AP (patience 4) — prevents the late-epoch
-  drift visible once the one-epoch optimum is passed.
-Embedding tables additionally use a frozen zero vector for the unseen-category
-index (`embeddings.py`), which regularizes behaviour on airports/carriers absent
-from training.
-
-## Out of scope here
-
-Whether the embeddings improve prediction quality *relative to the AML baseline*
-is the Priority-5 evaluation task (`scripts/compare_aml_dl.py`), not part of this
-DL-internal ablation.
+```bash
+python scripts/run_dl_ablation.py
+```
