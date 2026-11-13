@@ -21,6 +21,7 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 
 ## Table of Contents
 
+- [Submission Materials](#submission-materials)
 - [Overview](#overview)
 - [Problem Definition](#problem-definition)
 - [System Architecture](#system-architecture)
@@ -42,6 +43,14 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 
 ---
 
+## Submission Materials
+
+- [Presentation (PowerPoint)](presentation/project21-presentation.pptx)
+- [IEEE report (PDF)](paper/main.pdf) and [LaTeX source](paper/main.tex)
+- [Demo and viva guide](docs/submission.md)
+- [Phase 2 metrics](reports/dl/metrics.csv), [controlled ablation](reports/dl/controlled_ablation.csv),
+  and [schedule-and-route comparison](reports/dl/schedule_only_metrics.csv)
+
 ## Overview
 
 Flight delays are expensive and disruptive, and most operational value comes
@@ -55,8 +64,8 @@ The work is delivered in two phases:
 
 | Phase | Focus | State |
 |-------|-------|-------|
-| **Advanced ML** | Leakage-safe data pipeline, feature engineering, classical classifiers, calibrated evaluation and offline rescheduling what-if | Complete |
-| **Deep Learning** | Embedding MLP (learned airline/airport embeddings) reusing the same partitions and pre-departure contract, plus a leakage-safe ML+DL hybrid, a DL ablation study and the AML-vs-DL comparison | Complete — AML, MLP and hybrid compared on chronological validation |
+| **Advanced ML** | Pre-departure feature allowlist, classical classifiers, calibrated evaluation and offline rescheduling what-if | Complete |
+| **Deep Learning** | Airline and airport embeddings, PyTorch MLP, XGBoost–MLP stacking fitted on calibration, and matched-seed ablation | Complete. AML, MLP and hybrid compared on chronological validation. |
 
 ---
 
@@ -68,7 +77,7 @@ The work is delivered in two phases:
 | **Target** | `is_delayed` — arrival delay ≥ 15 minutes |
 | **Prediction time** | Before scheduled departure |
 | **Excluded signals** | Actual departure time, departure delay, arrival time, air time, arrival delay |
-| **Validation** | Chronological split (no future leaks into the past) |
+| **Validation** | Chronological train, calibration, validation and test windows |
 | **Primary metrics** | Average Precision (AP) and ROC-AUC, supported by precision and recall |
 
 The target is defined in [`target.py`](src/flight_delay/features/target.py);
@@ -136,7 +145,7 @@ what we did, where the code lives, and where the written result is.
 |---|-------|-------------|------|----------|
 | 1 | **Data loading & cleaning** | Loaded 336,776 raw 2013 NYC-origin flights; validated the schema; dropped 9,430 rows with an undefined arrival outcome (no imputation) → **327,346 usable** rows. | [`load.py`](src/flight_delay/data/load.py), [`target.py`](src/flight_delay/features/target.py) | [data_contract.md](docs/data_contract.md), [data_dictionary.md](docs/data_dictionary.md) |
 | 2 | **Exploratory data analysis** | On the **training partition only**, quantified the drivers of delay: time-of-day (~10.5% → ~40%), season, carrier, origin and route spread, and the flat distance profile. Produced the committed EDA figures. | [`01_data_exploration.ipynb`](notebooks/01_data_exploration.ipynb) | [feature_analysis.md](docs/feature_analysis.md) + figures below |
-| 3 | **Feature engineering** | Built four leakage-safe engines: cyclic temporal, static route, prior-date historical aggregates, and schedule-based congestion proxies. Enforced a pre-departure allowlist. **31-feature** canonical set; **33-feature** congestion variant. | [`features/`](src/flight_delay/features/) | [feature_policy.md](docs/feature_policy.md), [historical_features.md](docs/historical_features.md) |
+| 3 | **Feature engineering** | Built cyclic temporal and static route features, prior-date historical aggregates, and schedule-based congestion proxies. Enforced a pre-departure allowlist. **31-feature** canonical set and **33-feature** congestion variant. | [`features/`](src/flight_delay/features/) | [feature_policy.md](docs/feature_policy.md), [historical_features.md](docs/historical_features.md) |
 | 4 | **Chronological split & calibration windows** | Split by **calendar date** 70/15/15; split training again in time into a base-train window (fit models) and a late-training calibration window (fit calibrators). | [`split.py`](src/flight_delay/data/split.py), [`prepare.py`](src/flight_delay/data/prepare.py) | report §Methodology |
 | 5 | **Logistic Regression baseline** | Trained class-balanced Logistic Regression on the shared pipeline and feature contract. | [`logistic.py`](src/flight_delay/models/logistic.py), [`03_logistic_regression.ipynb`](notebooks/03_logistic_regression.ipynb) | [model_comparison.md](docs/model_comparison.md) |
 | 6 | **XGBoost tuning** | Tuned XGBoost with `RandomizedSearchCV` over expanding, date-grouped, embargoed chronological folds on **training data only** (250 trees, depth 6, lr 0.03, …). | [`xgboost_model.py`](src/flight_delay/models/xgboost_model.py), [`04_xgboost.ipynb`](notebooks/04_xgboost.ipynb) | [xgboost_methodology.md](docs/xgboost_methodology.md), [xgboost_results.md](docs/xgboost_results.md) |
@@ -353,7 +362,7 @@ flowchart LR
 | **Encoding & embeddings** | Train-fitted vocabularies for carrier/origin/dest with reserved missing (`0`) and unseen (`1`) indices; train-fitted numeric imputation/scaling; row-aligned integer + dense tensors; three `nn.Embedding` tables. | [`encoding.py`](src/flight_delay/deep_learning/encoding.py), [`embeddings.py`](src/flight_delay/deep_learning/embeddings.py) | [dl_architecture.md](docs/dl_architecture.md) |
 | **Embedding MLP** | Concatenates the three embeddings with the dense block; configurable dense layers, ReLU and dropout; one delay logit per flight; architecture independent of the training loop. | [`mlp.py`](src/flight_delay/deep_learning/mlp.py) | [dl_architecture.md](docs/dl_architecture.md) |
 | **Training & tuning** | PyTorch train/val loops, `BCEWithLogitsLoss` + AdamW, early stopping on validation Average Precision, seed-controlled reproducibility, best-checkpoint + hyperparameter export, predictions in the project CSV schema. | [`train.py`](src/flight_delay/deep_learning/train.py), [`dl_config.yaml`](configs/dl_config.yaml) | [dl_ablation.md](docs/dl_ablation.md) |
-| **Hybrid (ML+DL)** | Leakage-safe logistic stack over frozen XGBoost + MLP probabilities, fitted on calibration, evaluated on validation. | [`hybrid.py`](src/flight_delay/deep_learning/hybrid.py), [`build_hybrid.py`](scripts/build_hybrid.py) | [hybrid_approach.md](docs/hybrid_approach.md) |
+| **Hybrid (ML+DL)** | Logistic stack over frozen XGBoost and MLP probabilities, fitted on calibration and evaluated on validation. | [`hybrid.py`](src/flight_delay/deep_learning/hybrid.py), [`build_hybrid.py`](scripts/build_hybrid.py) | [hybrid_approach.md](docs/hybrid_approach.md) |
 
 ### Phase 2 validation results
 
@@ -604,7 +613,7 @@ Hyperparameter selection and the Phase 2 comparison use validation.
 | [dl_data_contract.md](docs/dl_data_contract.md) | DL dataset adapter, partition provenance and leakage audit |
 | [dl_architecture.md](docs/dl_architecture.md) | Embedding MLP architecture, tensor interface and training interface |
 | [dl_ablation.md](docs/dl_ablation.md) | DL hyperparameter/regularization ablation study |
-| [hybrid_approach.md](docs/hybrid_approach.md) | Leakage-safe ML+DL stacked hybrid, error-diversity analysis and verdict |
+| [hybrid_approach.md](docs/hybrid_approach.md) | XGBoost–MLP stack, residual correlation and validation results |
 | [dl_evaluation.md](docs/dl_evaluation.md) | AML-vs-DL comparison protocol, aligned metrics, recall-at-precision and figures |
 | [dl_literature_review.md](docs/dl_literature_review.md) | Deep-learning literature review grounded in the project's findings |
 

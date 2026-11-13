@@ -35,19 +35,19 @@ An Offline Rescheduling Analysis}
 
 \author{
 \IEEEauthorblockN{Samiksha Jangid}
-\IEEEauthorblockA{Data Pipeline \&\\ Leakage Prevention\\ Team T022, Section C}
+\IEEEauthorblockA{Team T022, Section C}
 \and
 \IEEEauthorblockN{Rashmi Anand}
-\IEEEauthorblockA{Exploratory Analysis \&\\ Feature Engineering\\ Team T022, Section C}
+\IEEEauthorblockA{Team T022, Section C}
 \and
 \IEEEauthorblockN{Ankit Raj Singh}
-\IEEEauthorblockA{Logistic Regression\\ Baseline\\ Team T022, Section C}
+\IEEEauthorblockA{Team T022, Section C}
 \and
 \IEEEauthorblockN{Shubhaang Kataruka}
-\IEEEauthorblockA{XGBoost \&\\ Hyperparameter Tuning\\ Team T022, Section C}
+\IEEEauthorblockA{Team T022, Section C}
 \and
 \IEEEauthorblockN{Lakshya}
-\IEEEauthorblockA{Evaluation \&\\ Calibration\\ Team T022, Section C}
+\IEEEauthorblockA{Team T022, Section C}
 }
 
 \maketitle
@@ -180,7 +180,7 @@ scores used for calibration.
 \section{Dataset and Exploratory Analysis}
 \label{sec:data}
 The dataset comprises the 2013 flights departing the three major New York
-airports (EWR, JFK, LGA), the Kaggle starter dataset recommended for the
+airports (EWR, JFK, LGA), the Kaggle starter dataset~\cite{kaggle} recommended for the
 project; the BTS on-time performance data is the larger official extension
 reserved for later work. After removing flights with an undefined arrival
 outcome, $327{,}346$ records remain. The overall delay base rate is
@@ -714,7 +714,9 @@ flights. AP and trapezoidal PR area are reported separately. The 25\% precision
 floor was attainable for calibrated Logistic Regression (5.56\% recall) and
 unattainable for calibrated XGBoost, calibrated MLP and the hybrid. The exported
 precision, recall, F1 and confusion counts use each model's validation maximum
-F1 threshold. These operating points describe validation performance.
+F1 threshold. Calibrated XGBoost reaches precision $0.2162$, recall $0.5934$
+and F1 $0.3169$ at threshold $0.2500$. The calibrated MLP reaches F1 $0.3155$
+at $0.2756$, and the hybrid reaches F1 $0.3170$ at $0.2105$.
 
 \begin{table}[t]
 \centering
@@ -735,7 +737,7 @@ Hybrid & .2093 & .2092 & .6255 & .137145 \\
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\columnwidth]{phase2-reliability}
+  \includegraphics[width=0.87\columnwidth]{phase2-reliability}
   \caption{Validation reliability for the calibrated AML models, calibrated
   embedding MLP, and hybrid. The diagonal indicates perfect calibration.}
   \label{fig:phase2-reliability}
@@ -755,28 +757,20 @@ creates large tied groups.
 
 \section{Discussion and Limitations}
 \label{sec:discussion}
-The results are deliberately unembellished. Discrimination is modest
-(ROC-AUC $\approx 0.60$), the calibrated probabilities do not convincingly
-improve on a prevalence baseline in proper-score terms, and the between-model
-difference is not statistically established. These results describe the tested
-models and dataset; they do not establish a performance ceiling. Forecast
-weather, live operational conditions and upstream-aircraft state are potential
-additional signals whose value was not evaluated here. The gain-importance
-ranking (Fig.~\ref{fig:importance}) describes this fitted model only and does
-not bound other pre-departure classifiers. The rescheduling analysis shows a
-narrow operating regime. Key limitations: (i) historical features guarantee
-prior-date ordering but not exact availability-time safety; (ii) the data cover a
-single year and only three New York origin airports, limiting generalisation;
-(iii) the calibration study is conditional on hyperparameters chosen over the
-full original training period and is not fully nested; (iv) the rescheduling
-cost model assumes homogeneous, independent per-flight costs with no network
-feedback; (v) delay prevalence shifts substantially across the chronological
-partitions (Fig.~\ref{fig:prevalence}), so prevalence-dependent metrics are not
-directly comparable across windows; and (vi) the validation-only congestion
-ablation changed the aggregate ranking metrics only slightly in this dataset,
-which does not establish the features' value in a larger multi-airport setting.
-None of the
-results supports a production-readiness claim.
+Held-out discrimination is modest (ROC-AUC $\approx 0.60$). The audit did
+not establish a between-model difference or a proper-score improvement over
+a prevalence baseline. Delay prevalence shifts across windows
+(Fig.~\ref{fig:prevalence}), which limits direct comparison of AP between
+partitions. The gain-importance ranking in Fig.~\ref{fig:importance} describes
+the fitted XGBoost model. The validation-only congestion ablation changed
+ranking metrics slightly on this dataset.
+
+The data cover one year and three New York origin airports. Prior-date
+ordering leaves exact historical availability unverified. The calibration
+study conditions on hyperparameters selected over the full original training
+period. The offline cost model assumes homogeneous, independent per-flight
+costs and omits network feedback. Testing broader coverage, weather forecasts
+and upstream-aircraft state would require additional data.
 
 \section{Conclusion and Future Work}
 \label{sec:conclusion}
@@ -792,13 +786,11 @@ XGBoost was $0.000054$, with lower AP. The larger BTS on-time dataset offers a
 route to broader geographic coverage and a sterner test of generalisation.
 
 \section*{Reproducibility}
-The pipeline, models, evaluation and rescheduling analysis are implemented as a
-tested Python package with continuous integration for the classical and
-CPU PyTorch paths. The frozen evaluation records the
-dataset and artifact SHA-256 hashes and the exact dependency versions, so a
-reviewer can confirm that the reported numbers came from the committed data and
-code; the final test stage is additionally guarded so it cannot be silently
-re-run or re-selected.
+Continuous integration tests the classical and CPU PyTorch paths. The frozen
+evaluation records dataset and artifact SHA-256 hashes and dependency versions.
+The Phase 2 checkpoint verifier reproduced all 50,466 validation probabilities
+exactly. The repository includes prediction CSVs, matched-seed runs, the
+presentation, and a demonstration guide.
 
 \section*{Team Contributions}
 In Phase 2, Lakshya integrated the dataset and audited historical availability.
@@ -822,6 +814,7 @@ Shubhaang Kataruka implemented the AML--DL comparison and checkpoint audit.
 \bibitem{grinsztajn} L. Grinsztajn, E. Oyallon, and G. Varoquaux, ``Why do tree-based models still outperform deep learning on tabular data?,'' \emph{arXiv preprint arXiv:2207.08815}, 2022.
 \bibitem{shwartzziv} R. Shwartz-Ziv and A. Armon, ``Tabular Data: Deep Learning is Not All You Need,'' \emph{arXiv preprint arXiv:2106.03253}, 2021.
 \bibitem{fbgbdt} X. He et al., ``Practical Lessons from Predicting Clicks on Ads at Facebook,'' in \emph{Proceedings of the 8th International Workshop on Data Mining for Online Advertising (ADKDD)}, 2014, pp. 1--9.
+\bibitem{kaggle} M. Sajadi, Flights, Kaggle. [Online]. Available: \url{https://www.kaggle.com/datasets/matinsajadi/flights}.
 \end{thebibliography}
 
 \end{document}
