@@ -46,7 +46,8 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 ## Submission Materials
 
 - [Presentation (PowerPoint)](presentation/project21-presentation.pptx)
-- [IEEE report (PDF)](paper/main.pdf) and [LaTeX source](paper/main.tex)
+- [IEEE report — both phases (PDF)](paper/main.pdf) and [LaTeX source](paper/main.tex)
+- [Deep Learning report — comprehensive (PDF)](paper/dl/report_dl.pdf) and [LaTeX source](paper/dl/report_dl.tex) — the full classical baseline (EDA, feature engineering, held-out test, feature importance, rescheduling) merged with the Phase 2 deep-learning study
 - [Demo and viva guide](docs/submission.md)
 - [Phase 2 metrics](reports/dl/metrics.csv), [controlled ablation](reports/dl/controlled_ablation.csv),
   and [schedule-and-route comparison](reports/dl/schedule_only_metrics.csv)
@@ -470,7 +471,10 @@ flight-delay-prediction/
 ├── docs/               Data contract, dictionaries, feature/eval/rescheduling + DL reports
 ├── models/             Saved model artifacts (ignored)
 ├── notebooks/          EDA, logistic regression, XGBoost, evaluation
-├── paper/              IEEE-format LaTeX report (main.tex) and figures
+├── paper/              IEEE-format LaTeX reports and figures
+│   ├── main.tex        Combined both-phases report (main.pdf)
+│   ├── figures/        Figures shared by both reports
+│   └── dl/             Comprehensive DL report (report_dl.tex/.pdf) and dl/figures/
 ├── reports/
 │   ├── figures/        EDA visualizations
 │   ├── results/        Model comparison outputs (ignored)
@@ -650,8 +654,9 @@ starter dataset); it is the only tracked file under `data/`.
 
 The suite covers data loading, target construction, the chronological split,
 every feature engine, and the feature-selection guard, with particular
-attention to leakage prevention in the historical features. The **66
-deep-learning tests** add the dataset adapter contract, encoding/embedding
+attention to leakage prevention in the historical features. The **54
+deep-learning tests** (across the six DL and hybrid test files, part of 196
+test functions in 28 files) add the dataset adapter contract, encoding/embedding
 behaviour, MLP forward/backward passes, training reproducibility and early
 stopping, the hybrid's leakage/alignment guards, and the AML-vs-DL comparison
 (prediction alignment, recall-at-precision, calibration selection).
