@@ -18,8 +18,8 @@
 \usepackage{xcolor}
 \usepackage{microtype}
 
-% Figures live in this folder (dl/figures) and in the shared paper/figures.
-\graphicspath{{figures/}{../figures/}}
+% Figures live in this folder (dl/figures) and in the shared paper/aml/figures.
+\graphicspath{{figures/}{../aml/figures/}}
 
 % Keep columns tidy and reduce awkward spacing/overfull lines.
 \emergencystretch=1.5em
@@ -76,9 +76,10 @@ Average Precision $0.337$, ROC-AUC $0.599$); on aligned validation the embedding
 MLP produces valid, well-behaved probabilities (AP $0.2082$ after isotonic
 calibration, ROC-AUC $0.6207$, Brier $0.1375$) but \emph{does not out-rank} the
 classical baseline (calibrated Logistic Regression AP $0.2233$, calibrated
-XGBoost $0.2129$). The hybrid is statistically indistinguishable from calibrated
-XGBoost (paired AP difference $-0.0047$, $95\%$ interval $[-0.0197, 0.0051]$) and
-improves Brier by only $0.000054$. We trace this negative result to its cause:
+XGBoost $0.2129$). The hybrid does not out-rank calibrated XGBoost either: its AP
+is $0.0036$ lower and its Brier only $0.000054$ lower, and a paired calendar-day
+bootstrap of the calibrated MLP against XGBoost (AP difference $-0.0047$, $95\%$
+interval $[-0.0197, 0.0051]$) includes zero. We trace this negative result to its cause:
 the XGBoost and MLP validation \emph{residuals are $0.968$-correlated}, so the
 stack has almost no error diversity to exploit, and the meta-learner collapses
 onto XGBoost (coefficients $+3.49$ vs.\ $-0.87$). This is exactly the behaviour
@@ -977,7 +978,8 @@ floor.
 
 \subsection{Calibration quality}
 \label{sec:calibration}
-Isotonic calibration brings every model to Brier $\approx 0.137$
+Isotonic calibration brings calibrated XGBoost, the MLP and the hybrid to Brier
+$\approx 0.137$ (calibrated Logistic Regression remains at $0.151$)
 (Fig.~\ref{fig:dlbrier}), and the reliability diagram
 (Fig.~\ref{fig:dlreliability}) shows the calibrated curves tracking the diagonal
 far better than the raw ones. Two reasoned observations follow.
@@ -1003,8 +1005,9 @@ usable but only modestly informative.
   \centering
   \includegraphics[width=\columnwidth]{dl-brier}
   \caption{Brier score by model. Isotonic calibration collapses the raw
-  differences; all calibrated models land near $0.137$, just below the
-  prevalence-baseline Brier of $0.138$.}
+  differences; calibrated XGBoost, the MLP and the hybrid land near $0.137$ (just
+  below the prevalence-baseline Brier of $0.138$), while calibrated Logistic
+  Regression stays at $0.151$.}
   \label{fig:dlbrier}
 \end{figure}
 

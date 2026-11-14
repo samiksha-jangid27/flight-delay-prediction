@@ -33,7 +33,7 @@ calibration without harming accuracy.
 *Our use.* The project deliverable requires **calibrated** probabilities. We
 report Brier score and log loss alongside ranking metrics, and compare raw vs
 sigmoid/isotonic-calibrated probabilities using the existing `calibration.py`.
-This paper is already cited in the Phase 1 report (`paper/main.tex`).
+This paper is already cited in the Phase 1 report (`paper/aml/main.tex`).
 
 *Our finding.* The raw MLP's validation Brier score was 0.209 and raw
 XGBoost's was 0.306. Isotonic calibration reduced both scores to about 0.137.

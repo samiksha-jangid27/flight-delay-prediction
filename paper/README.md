@@ -11,9 +11,14 @@ top-level `reports/` folder, which holds machine-generated, regenerable outputs
 
 ```
 paper/
-├── main.tex          The full report (IEEEtran class, self-contained bibliography)
-├── main.pdf          Compiled report for both phases
-├── figures/          All figures referenced by the report (PNG)
+├── aml/
+│   ├── main.tex      Combined both-phases report (IEEEtran class, self-contained bibliography)
+│   ├── main.pdf      Compiled both-phases report
+│   └── figures/      Figures referenced by the AML report (PNG)
+├── dl/
+│   ├── report_dl.tex Comprehensive DL report (carries the full Phase 1 study)
+│   ├── report_dl.pdf Compiled DL report
+│   └── figures/      Figures referenced by the DL report (PNG)
 └── README.md         This file
 ```
 
@@ -21,22 +26,26 @@ paper/
 
 ### Option A — Overleaf (no install)
 
-1. Create a new project and upload `main.tex` and the `figures/` folder
-   (or upload a zip of this `paper/` directory).
+1. Create a new project and upload a report folder — `aml/` (both-phases
+   `main.tex`) or `dl/` (`report_dl.tex`) — with its `figures/` subfolder
+   (or upload a zip of this `paper/` directory; the DL report's shared figures
+   resolve via `../aml/figures/`).
 2. Set the compiler to **pdfLaTeX** (Menu → Compiler).
 3. Compile. The `IEEEtran` class and all packages are available on Overleaf.
 
 ### Option B — Local TeX distribution
 
-Requires TeX Live or MiKTeX (both ship the `IEEEtran` class). From this folder:
+Requires TeX Live or MiKTeX (both ship the `IEEEtran` class). Build each report
+from its own folder:
 
 ```bash
-pdflatex main
-pdflatex main      # run twice so cross-references and labels resolve
+cd aml && pdflatex main && pdflatex main               # both-phases → main.pdf
+cd ../dl && pdflatex report_dl && pdflatex report_dl   # DL report → report_dl.pdf
 ```
 
-Produces `main.pdf`. With `latexmk` installed, `latexmk -pdf main` does both
-passes automatically. If the class is missing on a minimal TeX Live install:
+Run each `pdflatex` twice so cross-references and labels resolve. With `latexmk`
+installed, `latexmk -pdf main` (or `latexmk -pdf report_dl`) does both passes
+automatically. If the class is missing on a minimal TeX Live install:
 `tlmgr install ieeetran booktabs`.
 
 ## Notes

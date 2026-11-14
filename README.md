@@ -46,7 +46,7 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 ## Submission Materials
 
 - [Presentation (PowerPoint)](presentation/project21-presentation.pptx)
-- [IEEE report — both phases (PDF)](paper/main.pdf) and [LaTeX source](paper/main.tex)
+- [IEEE report — both phases (PDF)](paper/aml/main.pdf) and [LaTeX source](paper/aml/main.tex)
 - [Deep Learning report — comprehensive (PDF)](paper/dl/report_dl.pdf) and [LaTeX source](paper/dl/report_dl.tex) — the full classical baseline (EDA, feature engineering, held-out test, feature importance, rescheduling) merged with the Phase 2 deep-learning study
 - [Demo and viva guide](docs/submission.md)
 - [Phase 2 metrics](reports/dl/metrics.csv), [controlled ablation](reports/dl/controlled_ablation.csv),
@@ -472,8 +472,7 @@ flight-delay-prediction/
 ├── models/             Saved model artifacts (ignored)
 ├── notebooks/          EDA, logistic regression, XGBoost, evaluation
 ├── paper/              IEEE-format LaTeX reports and figures
-│   ├── main.tex        Combined both-phases report (main.pdf)
-│   ├── figures/        Figures shared by both reports
+│   ├── aml/            Combined both-phases report (main.tex/.pdf) and aml/figures/
 │   └── dl/             Comprehensive DL report (report_dl.tex/.pdf) and dl/figures/
 ├── reports/
 │   ├── figures/        EDA visualizations
@@ -718,7 +717,7 @@ dropping 9,430 rows with an undefined arrival outcome (0 duplicates); 16 carrier
 effect, not a bug): train **25.9%**, validation **15.6%**, test **26.9%**. Because
 precision–recall metrics depend on prevalence, cross-partition comparisons are not
 read as improvements. See the partition/monthly figure in the report
-(`paper/figures/prevalence-shift.png`).
+(`paper/aml/figures/prevalence-shift.png`).
 
 ## Evaluation and supplementary audits
 
