@@ -69,9 +69,9 @@ class CostModel:
         return float(tau) if tau <= 1.0 else None
 
 
-def _counts(y: np.ndarray, p: np.ndarray, threshold: float) -> dict[str, int]:
-    """Confusion counts for the decision ``p >= threshold`` (act on positives)."""
-    acted = p >= threshold
+def _counts(y: np.ndarray, p: np.ndarray, threshold: float | None) -> dict[str, int]:
+    """Confusion counts; ``None`` means never act, including when ``p == 1``."""
+    acted = np.zeros_like(p, dtype=bool) if threshold is None else p >= threshold
     delayed = y == 1
     return {
         "acted": int(acted.sum()),
@@ -105,18 +105,20 @@ def oracle_cost(n_delayed: float, cost: CostModel) -> float:
 
 
 def policy_outcome(
-    y: ArrayLike, p: ArrayLike, threshold: float, cost: CostModel
+    y: ArrayLike, p: ArrayLike, threshold: float | None, cost: CostModel
 ) -> dict:
-    """Score one action threshold: counts, costs and savings versus baselines.
+    """Score a decision rule; ``threshold=None`` explicitly means never act.
 
-    ``net_savings`` is the status-quo cost minus the policy cost and equals the
-    closed form ``tp * benefit_per_true_action - fp * cost_action``. The
-    oracle-efficiency fraction reports how much of the attainable saving the
-    policy captures; it is ``None`` when no positive saving is attainable.
+    A numeric threshold uses ``p >= threshold``. In contrast, ``None`` acts on
+    no flights even when ``p`` equals 1. ``net_savings`` is status-quo cost
+    minus policy cost; ``oracle_efficiency`` is null if no positive saving is
+    attainable.
     """
     y, p = validate(y, p)
-    if not np.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
-        raise ValueError("threshold must be finite and in [0, 1]")
+    if threshold is not None and (
+        not np.isfinite(threshold) or not 0.0 <= threshold <= 1.0
+    ):
+        raise ValueError("threshold must be None or finite and in [0, 1]")
     c = _counts(y, p, threshold)
     n = len(y)
     n_delayed = int(y.sum())
@@ -125,7 +127,7 @@ def policy_outcome(
     net = baseline - total
     oracle_saving = baseline - oracle_cost(n_delayed, cost)
     return {
-        "threshold": float(threshold),
+        "threshold": None if threshold is None else float(threshold),
         **c,
         "n": n,
         "n_delayed": n_delayed,
@@ -202,7 +204,7 @@ def cost_ratio_sweep(
             recovery=recovery,
         )
         tau = cost.optimal_threshold
-        outcome = policy_outcome(y, p, 1.0 if tau is None else tau, cost)
+        outcome = policy_outcome(y, p, tau, cost)
         rows.append(
             {
                 "cost_ratio": float(ratio),
@@ -246,6 +248,15 @@ def rescheduling_analysis(
     y = frame.y_true.to_numpy()
     p = frame.y_probability.to_numpy()
     validate(y, p)
+    # Pandas promotes missing numeric sweep values to NaN, including the
+    # optimal threshold and oracle efficiency. Restore strict JSON nulls.
+    sweep_records = cost_ratio_sweep(
+        y, p, recovery=cost.recovery, cost_delay=cost.cost_delay, ratios=ratios
+    ).to_dict("records")
+    for row in sweep_records:
+        for key, value in row.items():
+            if pd.isna(value):
+                row[key] = None
     report: dict = {
         "assumptions": {
             "cost_delay": cost.cost_delay,
@@ -276,9 +287,7 @@ def rescheduling_analysis(
             if cost.optimal_threshold is not None
             else None
         ),
-        "cost_ratio_sweep": cost_ratio_sweep(
-            y, p, recovery=cost.recovery, cost_delay=cost.cost_delay, ratios=ratios
-        ).to_dict("records"),
+        "cost_ratio_sweep": sweep_records,
     }
     if frozen_threshold is not None:
         report["policy_at_frozen_threshold"] = {

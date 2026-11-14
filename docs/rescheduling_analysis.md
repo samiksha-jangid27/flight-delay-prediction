@@ -64,6 +64,14 @@ operationally: the decision boundary is read directly off the cost assumptions,
 and only a well-calibrated probability makes `τ*` the right place to cut. The
 rule generalises decision-curve net benefit with an explicit recovery factor.
 
+**Never-act edge:** If recovery is zero or `C_a > r * C_d`, no feasible
+probability yields a cost-justified action. The implementation uses an explicit
+`None`/JSON `null` optimal threshold and acts on **zero** flights, even if a
+predicted probability is exactly 1.0. The numeric threshold 1.0 is not a
+never-act sentinel because the decision rule includes equality (`p >= 1.0`).
+A threshold exactly equal to 1.0 is a zero-expected-benefit tie at `p == 1.0`;
+the existing threshold convention remains unchanged for that distinct case.
+
 Baselines for context: **no action** costs `C_d · (#delayed)`; **reschedule
 everything** costs `C_a · N + (1−r)·C_d · (#delayed)`; the **perfect-foresight
 oracle** is the attainable lower bound and sets the scale for "oracle efficiency"
@@ -104,15 +112,16 @@ assumed cost ratio, recovery fixed at 0.8:
 
 Three findings:
 
-1. **There is a break-even cost ratio.** The model-guided rule beats the status
-   quo only when the action is cheap relative to a delay: up to `C_a/C_d ≈ 0.10`
-   for Balanced LR and up to `≈ 0.15` for XGBoost. Above that, intervention is not
-   justified by these probabilities.
-2. **XGBoost dominates Balanced LR across the sweep** — a positive-savings region
-   that extends further and higher oracle efficiency at equal cost ratios (e.g. 31%
-   vs 23% at ratio 0.10). This is a decision-relevant reason to prefer XGBoost that
-   the ranking metrics alone did not make vivid, and it is consistent with
-   XGBoost's stronger held-out AP/ROC-AUC.
+1. **No universal break-even follows from this finite grid.** Both models
+   have positive retrospective savings when the action is sufficiently cheap.
+   Across the listed ratios, LR is materially positive at 0.05–0.10 and XGBoost
+   through 0.15. The LR point at 0.30 is only +0.0001 per flight and involves
+   very few actions; it should not be presented as a reliable second profitable
+   region or as a monotonic break-even boundary.
+2. **XGBoost performs better at several intermediate ratios, not every point.**
+   Its net savings exceed LR at 0.10–0.25, but not at 0.30. This is a
+   validation-only cost-sensitivity tradeoff, not evidence that XGBoost
+   universally dominates LR or produces realised savings.
 3. **Best attainable efficiency is modest** (≈ 64% of the oracle at ratio 0.05,
    falling fast as actions get costlier), bounding how much any policy built on the
    current probabilities can deliver.
