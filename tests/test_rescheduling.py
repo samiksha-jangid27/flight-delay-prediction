@@ -1,5 +1,7 @@
 """Synthetic contracts for the offline rescheduling what-if analysis."""
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -118,3 +120,44 @@ def test_rescheduling_analysis_rejects_bad_frame():
         rescheduling_analysis(
             pd.DataFrame({"y_true": [], "y_probability": []})
         )
+
+
+@pytest.mark.parametrize(
+    ("recovery", "ratio"), [(0.5, 0.75), (0.0, 0.25)]
+)
+def test_never_act_rule_at_probability_one(recovery, ratio):
+    """Threshold 1.0 is NOT a never-act sentinel: 1.0 >= 1.0."""
+    y = np.array([1, 0, 1, 0])
+    p = np.array([1.0, 1.0, 0.4, 0.0])
+    cost = CostModel(cost_delay=1.0, cost_action=ratio, recovery=recovery)
+    assert cost.optimal_threshold is None
+    assert policy_outcome(y, p, 1.0, cost)["acted"] == 2
+
+    explicit = policy_outcome(y, p, None, cost)
+    assert explicit["threshold"] is None
+    assert (explicit["acted"], explicit["tp"], explicit["fp"]) == (0, 0, 0)
+    assert (explicit["fn"], explicit["tn"]) == (2, 2)
+    assert explicit["policy_cost"] == pytest.approx(explicit["no_action_cost"])
+    assert explicit["net_savings_per_flight"] == pytest.approx(0)
+    assert explicit["beats_no_action"] is False
+
+    sweep = cost_ratio_sweep(y, p, recovery=recovery, ratios=[ratio])
+    assert pd.isna(sweep.iloc[0].optimal_threshold)
+    assert (sweep.iloc[0].acted, sweep.iloc[0].tp, sweep.iloc[0].fp) == (0, 0, 0)
+    assert sweep.iloc[0].net_savings_per_flight == pytest.approx(0)
+
+
+def test_never_act_report_uses_json_null_and_preserves_normal_ratio():
+    frame = pd.DataFrame(
+        {"y_true": [1, 0, 1, 0], "y_probability": [1., 1., 0.4, 0.]}
+    )
+    cost = CostModel(cost_delay=1., cost_action=0.75, recovery=0.5)
+    report = rescheduling_analysis(frame, cost=cost, ratios=[0.1, 0.75])
+    assert report["policy_at_optimal_threshold"] is None  # explicit no-action
+    low, high = report["cost_ratio_sweep"]
+    assert low["optimal_threshold"] == pytest.approx(0.2)
+    assert low["acted"] > 0
+    assert high["optimal_threshold"] is None
+    assert high["acted"] == high["tp"] == high["fp"] == 0
+    assert high["net_savings_per_flight"] == pytest.approx(0.0)
+    json.dumps(report, allow_nan=False)  # must be valid strict JSON
