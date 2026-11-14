@@ -14,16 +14,15 @@ near each other, and generalizes better on **high-cardinality** features where
 other methods overfit. The learned embeddings can also be reused as features for
 other models.
 
-*Our use.* This is the core justification for embedding `carrier`, `origin`, and
-`dest` rather than one-hot encoding them (`embeddings.py`, `mlp.py`). Origin and
-destination are high-cardinality airport codes — exactly the regime the paper
-targets.
+*Our use.* The MLP learns embeddings for `carrier`, `origin`, and `dest`
+(`embeddings.py`, `mlp.py`). Destination has a larger vocabulary than origin,
+which has only three airports in this dataset.
 
-*Our finding.* The embeddings trained and produced valid representations, but on
-this dataset they did **not** out-rank the AML baseline, and their probabilities
-are 0.97-correlated with XGBoost's (see `docs/hybrid_approach.md`). The
-pre-departure signal is weak enough that the latent structure the embeddings
-capture largely overlaps with the engineered route/congestion features.
+*Our finding.* The embedding MLP had lower validation Average Precision than
+the AML baselines. On the same validation flights, its raw probabilities had
+Pearson correlation **0.907** with raw XGBoost probabilities. The residual
+correlation was **0.968**, where each residual is the observed label minus
+the raw predicted probability. See [the hybrid analysis](hybrid_approach.md#error-diversity-and-interpretation).
 
 ## 2. Probability calibration of neural networks
 **Guo, Pleiss, Sun & Weinberger (2017), "On Calibration of Modern Neural
@@ -36,9 +35,9 @@ report Brier score and log loss alongside ranking metrics, and compare raw vs
 sigmoid/isotonic-calibrated probabilities using the existing `calibration.py`.
 This paper is already cited in the Phase 1 report (`paper/main.tex`).
 
-*Our finding.* The raw MLP (Brier 0.209) is better calibrated than raw XGBoost
-(0.306) because BCE training with no class reweighting keeps probabilities near
-the base rate; post-hoc isotonic calibration brings every model to Brier ≈ 0.14.
+*Our finding.* The raw MLP's validation Brier score was 0.209 and raw
+XGBoost's was 0.306. Isotonic calibration reduced both scores to about 0.137.
+Calibrated Logistic Regression reached 0.151.
 
 ## 3. Trees vs. deep learning on tabular data
 **Grinsztajn, Oyallon & Varoquaux (2022), "Why do tree-based models still
@@ -50,11 +49,9 @@ because of inductive biases better suited to irregular, feature-engineered
 tabular targets. Notably, Shwartz-Ziv & Armon also found that an **ensemble of
 deep models and XGBoost beat XGBoost alone** on their datasets.
 
-*Our finding.* We reproduce the headline result — XGBoost is competitive with or
-better than the MLP on ranking — but **not** their ensembling result: on flight
-delays the DL+XGBoost ensemble does *not* beat XGBoost, because the base models'
-residuals are 0.968-correlated. This makes our negative hybrid result a
-dataset-specific, literature-consistent contribution rather than a failure.
+*Our finding.* Calibrated XGBoost achieved higher validation Average Precision
+than the calibrated MLP and the stack. The stack's Brier score was 0.000054
+lower than calibrated XGBoost's on this validation window.
 
 ## 4. Representation-level ML+DL fusion (the hybrid frontier)
 **He et al. (2014), "Practical Lessons from Predicting Clicks on Ads at
@@ -65,10 +62,9 @@ Guo & Berkhahn's point that learned embeddings transfer as features, this define
 the two credible representation-level hybrids (GBDT leaves → MLP, or MLP
 embeddings → XGBoost).
 
-*Our use.* We implement the simpler output-level stack now and document the
-representation-level fusion as the technically justified next step for the bonus
-(`docs/hybrid_approach.md`). Given the 0.968 residual correlation we expect
-limited upside, but these are the designs the literature supports.
+*Our use.* The implemented stack combines the two models' output
+probabilities. The [hybrid analysis](hybrid_approach.md) documents
+representation-level fusion as a possible follow-up.
 
 ## 5. Problem/domain reference
 **US Bureau of Transportation Statistics — Airline On-Time Performance
@@ -77,12 +73,10 @@ post-departure outcome columns that must be excluded from pre-departure features
 underpins the leakage audit in `docs/dl_data_contract.md`.
 
 ## Takeaway for this project
-The architecture choices (entity embeddings, BCE + AdamW, calibration-aware
-evaluation) are directly grounded in the literature. The central empirical
-finding — DL matches but does not beat gradient boosting, and adds no ensemble
-value here — is exactly what the tabular-DL literature predicts for a
-feature-engineered problem with a weak signal, and we support it with a
-quantitative error-diversity analysis rather than assertion.
+The experiments compare learned categorical representations with engineered
+tabular features on the same chronological validation rows. The residual
+analysis and metrics show how closely the models' errors overlap and how
+stacking affects ranking and probability quality.
 
 ## Sources
 - Guo & Berkhahn 2016 — https://arxiv.org/abs/1604.06737

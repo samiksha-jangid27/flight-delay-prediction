@@ -1,5 +1,7 @@
 """Training, early stopping, checkpoint restoration, and prediction exports."""
 
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -170,3 +172,11 @@ def test_training_reloads_checkpoint_and_exports_project_schema(tmp_path, monkey
     )
     assert (output_dir / "best_hyperparameters.yaml").is_file()
     assert (output_dir / "tuning_results.csv").is_file()
+    summary = json.loads((output_dir / "training_summary.json").read_text(encoding="utf-8"))
+    for key, filename in (
+        ("checkpoint", "best_model.pt"),
+        ("validation_predictions", "validation_predictions.csv"),
+        ("train_calibration_predictions", "train_calibration_predictions.csv"),
+    ):
+        assert summary[key] == f"reports/dl/{filename}"
+        assert (tmp_path / summary[key]).is_file()

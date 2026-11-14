@@ -451,16 +451,21 @@ def run_training(
     validation_predictions.to_csv(
         output_path / "validation_predictions.csv", index=False
     )
+    summary_output_path = output_path.resolve()
+    if summary_output_path.is_relative_to(project_root):
+        summary_output_path = summary_output_path.relative_to(project_root)
     summary = {
         "seed": config["seed"],
         "selection_metric": "validation average precision",
         "test_partition_used_for_selection": False,
         "best_hyperparameters": best_hyperparameters,
-        "checkpoint": str(checkpoint_path),
-        "validation_predictions": str(output_path / "validation_predictions.csv"),
-        "train_calibration_predictions": str(
-            output_path / "train_calibration_predictions.csv"
-        ),
+        "checkpoint": (summary_output_path / checkpoint_path.name).as_posix(),
+        "validation_predictions": (
+            summary_output_path / "validation_predictions.csv"
+        ).as_posix(),
+        "train_calibration_predictions": (
+            summary_output_path / "train_calibration_predictions.csv"
+        ).as_posix(),
     }
     (output_path / "training_summary.json").write_text(
         json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8"

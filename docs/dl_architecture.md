@@ -84,7 +84,9 @@ scored only after the best checkpoint has been reloaded.
 The configured output directory (`reports/dl/`) receives `best_model.pt`,
 `best_hyperparameters.yaml`, `tuning_results.csv`,
 `train_calibration_predictions.csv`, `validation_predictions.csv`, and run
-metadata. Prediction CSVs use the project schema:
+metadata. Paths in `training_summary.json` are relative to the project root
+for outputs inside the checkout. Outputs outside the checkout use absolute
+paths. Prediction CSVs use the project schema:
 `flight_id, flight_date, y_true, y_probability, partition`.
 
 ## Verification

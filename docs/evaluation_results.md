@@ -169,10 +169,10 @@ PNG figures use a headless Matplotlib backend and 220 DPI. Reliability counts ar
 The suite history and environment-specific validation are documented in
 [`evaluation_audit.md`](evaluation_audit.md). Run the current test suite for
 the verified count; historical counts in this report describe earlier
-checkpoints, not the present repository state.
+checkpoints, not the present repository state. Run the following commands from
+the root of your checkout.
 
 ```bash
-cd /Users/lakshyachoudhary/Documents/flight-delay-prediction
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .

@@ -16,7 +16,7 @@
     "best_epoch": 1,
     "validation_average_precision": 0.2065833894139669
   },
-  "checkpoint": "/Users/rashmianand/Desktop/Projects/DL PROJECT/flight-delay-prediction/reports/dl/best_model.pt",
-  "validation_predictions": "/Users/rashmianand/Desktop/Projects/DL PROJECT/flight-delay-prediction/reports/dl/validation_predictions.csv",
-  "train_calibration_predictions": "/Users/rashmianand/Desktop/Projects/DL PROJECT/flight-delay-prediction/reports/dl/train_calibration_predictions.csv"
+  "checkpoint": "reports/dl/best_model.pt",
+  "validation_predictions": "reports/dl/validation_predictions.csv",
+  "train_calibration_predictions": "reports/dl/train_calibration_predictions.csv"
 }
