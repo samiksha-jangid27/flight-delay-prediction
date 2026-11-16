@@ -6,8 +6,8 @@ Flight Delay Prediction via Gradient Boosting and Temporal Deep Learning
 
 | Material | File |
 | --- | --- |
-| Presentation with speaker notes | [PowerPoint deck](../presentation/project21-presentation.pptx) |
-| IEEE report | [PDF](../paper/aml/main.pdf) · [LaTeX source](../paper/aml/main.tex) · [build instructions](../paper/README.md) |
+| Presentation | [PDF deck](<../presentation/Flight Delay Prediction — Phase 2 Deep Learning.pdf>) |
+| IEEE report | Phase 2 DL report [PDF](../paper/dl/report_dl.pdf) · [LaTeX source](../paper/dl/report_dl.tex); both-phases report [PDF](../paper/aml/main.pdf) · [LaTeX source](../paper/aml/main.tex) · [build instructions](../paper/README.md) |
 | Evaluation evidence | [Phase 1 manifest](canonical_evaluation.json) · [Phase 2 metrics](../reports/dl/metrics.csv) · [calibration and threshold protocol](dl_evaluation.md) |
 | Supplementary controls | [Matched-seed ablation](../reports/dl/controlled_ablation.csv) · [Schedule-and-route comparison](../reports/dl/schedule_only_metrics.csv) |
 

@@ -45,7 +45,7 @@ Team ID `T022` &nbsp;·&nbsp; Section `C`
 
 ## Submission Materials
 
-- [Presentation (PowerPoint)](presentation/project21-presentation.pptx)
+- [Presentation (PDF)](<presentation/Flight Delay Prediction — Phase 2 Deep Learning.pdf>)
 - [IEEE report — both phases (PDF)](paper/aml/main.pdf) and [LaTeX source](paper/aml/main.tex)
 - [Deep Learning report — comprehensive (PDF)](paper/dl/report_dl.pdf) and [LaTeX source](paper/dl/report_dl.tex) — the full classical baseline (EDA, feature engineering, held-out test, feature importance, rescheduling) merged with the Phase 2 deep-learning study
 - [Demo and viva guide](docs/submission.md)
@@ -695,10 +695,6 @@ versions and remaining limitations.
 | Ankit Raj Singh (2401010075) | Logistic Regression | Categorical Encoding & Embeddings |
 | Shubhaang Kataruka (2401010450) | XGBoost and Hyperparameter Tuning | Evaluation & AML vs DL Comparison |
 | Lakshya (2401020036) | Evaluation and Calibration | Dataset Integration & Leakage Audit |
-
----
-
-
 
 ---
 
